@@ -5,7 +5,7 @@ le seul réglage, tout le reste — plan de séance, quantité de nouveautés, f
 révision — en découle.
 
 **En ligne** : https://nmulongo-sys.github.io/comping/
-**Statut** : Passe 2.1 — piste médiator, chapitres, récursivité, repère à trois valeurs. Fichier HTML unique, aucune dépendance, fonctionne hors ligne.
+**Statut** : Passe 2.2 — séance autonome sur un seul écran, piste médiator, chapitres, récursivité. Fichier HTML unique, aucune dépendance, fonctionne hors ligne.
 
 ## Utilisation
 
@@ -14,8 +14,10 @@ Aucun compte, aucune installation ; toutes les données restent dans le navigate
 
 Cinq onglets :
 
-- **Séance** — régler la durée (8 à 75 min). Le plan en cinq blocs se recalcule, ainsi
-  que le nombre de nouveautés que le moteur s'autorise à introduire dans la journée.
+- **Séance** — régler la durée (8 à 75 min), puis lancer. Une séance en cours affiche
+  **sur un seul écran** : l'exercice concret du bloc, son métronome déjà réglé, le
+  décompte du bloc, les jalons des cinq blocs et le temps restant sur la séance
+  entière. Aucun changement d'onglet n'est nécessaire pendant qu'on joue.
 - **Chapitres** — le programme complet, par difficulté croissante. Chaque chapitre
   affiche sa difficulté isolée, ses cartes et **sa pièce d'application**, avec la raison
   technique du choix de cette pièce.
@@ -166,6 +168,28 @@ seule la typographie dégrade. Mobile d'abord : onglets bas fixes, cibles tactil
 `prefers-reduced-motion` respecté, focus clavier visible.
 
 ## Journal de développement
+
+### 2026-07-26 — Passe 2.2 : la séance devient autonome sur un seul écran
+- **Défaut de conception corrigé.** Le déroulé de séance n'affichait qu'un nom de bloc,
+  un décompte et un conseil générique : le contenu était dans l'onglet Cartes et le
+  métronome dans l'onglet Métronome. Il fallait donc changer d'onglet en pleine séance,
+  guitare en main, et le décompte disparaissait dès qu'on le faisait.
+- Le rendu d'un exercice (consigne, notation rythmique, métronome préréglé, critère,
+  boutons de notation) est factorisé dans `rendreExercice(carte, hôte, options)`, servant
+  désormais l'onglet Cartes **et** le déroulé de séance. L'ancien balisage statique
+  `#rev-*` est supprimé.
+- `contenuBloc(id)` choisit l'exercice concret de chaque bloc : échauffement — le repère
+  le plus exigeant déjà acquis, sinon le pendule ; drill — la carte médiator ou notion en
+  tête de file, à défaut la carte du chapitre au plus faible record ; nouveauté — la
+  première carte débloquée, notée sur place ; application — la pièce du chapitre avec sa
+  grille et sa mesure (carte de type `piece` du chapitre, ou carte volatile via
+  `cartePiece()`) ; cartes dues — la file du jour jouée en ligne, avec notation.
+- Ajout des jalons de séance (cinq segments) et du temps restant global, rafraîchis à
+  chaque seconde. Le métronome s'arrête à chaque changement de bloc et en fin de séance.
+- Garde-fou sur `scrollIntoView`, absent de certains contextes d'exécution.
+- Validation headless jsdom : chargement sans erreur, parcours des cinq blocs, présence
+  de l'exercice et du métronome préréglé dans chacun, démarrage et arrêt du métronome
+  depuis la page de séance, révision de l'onglet Cartes intacte, aucune erreur runtime.
 
 ### 2026-07-26 — Passe 2.1 : le repère devient un réglage à trois valeurs
 - **Défaut corrigé.** Le booléen `jazz` accentuait 2 et 4 mais laissait sonner tous les
