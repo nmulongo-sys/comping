@@ -1,0 +1,1382 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#F5EFE3">
+<title>comping — guitare rythmique</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;1,400&family=Work+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --creme:#F5EFE3; --creme2:#EBE0CD; --creme3:#DFD1B8;
+  --encre:#2B2320; --encre-doux:#6B5B4E; --sepia:#8B6F47;
+  --or:#B8892B; --brique:#9E4A32; --vert:#4F6B45; --bleu:#3F5A6B;
+  --rayon:3px;
+  --serif:"Cormorant Garamond",Georgia,"Times New Roman",serif;
+  --sans:"Work Sans",-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;padding:0}
+body{background:var(--creme);color:var(--encre);font-family:var(--sans);font-size:16px;line-height:1.5;
+  padding-bottom:calc(66px + env(safe-area-inset-bottom));overscroll-behavior-y:none}
+h1,h2,h3{font-family:var(--serif);font-weight:600;margin:0}
+h1{font-size:1.9rem;line-height:1.1}
+h2{font-size:1.3rem;margin-bottom:.3rem}
+h3{font-size:1.08rem}
+p{margin:.4rem 0}
+small{font-size:.8rem;color:var(--encre-doux)}
+code{font-size:.85em;background:var(--creme2);padding:1px 4px;border-radius:2px}
+
+header{padding:calc(13px + env(safe-area-inset-top)) 18px 11px;border-bottom:1px solid var(--creme3);
+  display:flex;align-items:baseline;justify-content:space-between;gap:10px}
+header .marque{font-family:var(--serif);font-size:1.45rem;font-weight:600}
+header .marque em{font-style:italic;color:var(--or)}
+header .jour{font-size:.72rem;color:var(--encre-doux);text-align:right;line-height:1.3}
+
+nav{position:fixed;bottom:0;left:0;right:0;z-index:40;display:grid;grid-template-columns:repeat(5,1fr);
+  background:var(--creme2);border-top:1px solid var(--creme3);padding-bottom:env(safe-area-inset-bottom)}
+nav button{appearance:none;border:0;background:none;font-family:var(--sans);font-size:.66rem;font-weight:500;
+  color:var(--encre-doux);padding:8px 2px 9px;cursor:pointer;display:flex;flex-direction:column;align-items:center;
+  gap:2px;min-height:56px;justify-content:center;border-top:2px solid transparent;position:relative}
+nav button .ico{font-size:1.1rem;line-height:1}
+nav button[aria-current="page"]{color:var(--encre);border-top-color:var(--or)}
+nav .pastille{position:absolute;top:5px;right:calc(50% - 22px);background:var(--brique);color:#fff;
+  border-radius:9px;font-size:.6rem;padding:0 5px;font-weight:600;line-height:1.6}
+
+main{padding:15px 18px 28px;max-width:660px;margin:0 auto}
+.vue{display:none}
+.vue.actif{display:block;animation:apparait .18s ease-out}
+@keyframes apparait{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+
+.carte{background:#FBF7EE;border:1px solid var(--creme3);border-radius:var(--rayon);padding:13px 14px;margin:11px 0}
+.carte.souligne{border-left:3px solid var(--or)}
+.carte.verrou{opacity:.62}
+.rang{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.etiquette{font-size:.65rem;text-transform:uppercase;letter-spacing:.12em;color:var(--sepia);font-weight:600}
+hr{border:0;border-top:1px solid var(--creme3);margin:15px 0}
+
+button.b{appearance:none;font-family:var(--sans);font-size:.93rem;font-weight:500;border:1px solid var(--encre);
+  background:var(--encre);color:var(--creme);border-radius:var(--rayon);padding:10px 15px;cursor:pointer;min-height:44px}
+button.b:active{transform:translateY(1px)}
+button.b.creux{background:transparent;color:var(--encre)}
+button.b.or{background:var(--or);border-color:var(--or);color:#fff}
+button.b.petit{padding:6px 10px;font-size:.8rem;min-height:36px}
+button.b:disabled{opacity:.4;cursor:default}
+.ligne-b{display:flex;gap:8px;flex-wrap:wrap}
+
+input[type=number],input[type=text],select,textarea{font-family:var(--sans);font-size:1rem;color:var(--encre);
+  background:#FFFDF8;border:1px solid var(--creme3);border-radius:var(--rayon);padding:9px 10px;width:100%;min-height:42px}
+textarea{min-height:60px;resize:vertical}
+label.champ{display:block;margin:9px 0}
+label.champ span{display:block;font-size:.74rem;color:var(--encre-doux);margin-bottom:4px}
+input[type=range]{width:100%;accent-color:var(--or);height:32px}
+.bascule{display:flex;align-items:center;gap:9px;margin:8px 0;cursor:pointer}
+.bascule input{width:20px;height:20px;accent-color:var(--or);flex:0 0 auto}
+.bascule span{font-size:.89rem}
+
+.scene{display:flex;flex-direction:column;align-items:center;gap:5px;margin:4px 0 12px}
+#cadran{width:min(74vw,280px);height:min(74vw,280px);touch-action:manipulation}
+.bpm-affiche{font-family:var(--serif);font-size:3.2rem;line-height:1;font-weight:600}
+.bpm-affiche sup{font-family:var(--sans);font-size:.68rem;font-weight:500;color:var(--encre-doux);
+  letter-spacing:.14em;text-transform:uppercase;vertical-align:super}
+.compteur{font-size:.74rem;color:var(--encre-doux);letter-spacing:.05em}
+
+.puces{display:flex;gap:6px;flex-wrap:wrap;margin:4px 0}
+.puce{border:1px solid var(--creme3);background:#FFFDF8;color:var(--encre-doux);border-radius:20px;
+  padding:6px 12px;font-size:.79rem;cursor:pointer;min-height:36px;font-family:var(--sans)}
+.puce[aria-pressed="true"]{background:var(--encre);border-color:var(--encre);color:var(--creme)}
+
+.embarque{background:var(--creme2);border:1px solid var(--creme3);border-radius:var(--rayon);
+  padding:10px 11px;margin:11px 0;text-align:left}
+.embarque .haut{display:flex;align-items:center;gap:9px}
+.embarque .lecture{appearance:none;border:0;background:var(--encre);color:var(--creme);width:46px;height:46px;
+  border-radius:50%;font-size:1.05rem;cursor:pointer;flex:0 0 auto;line-height:1;display:flex;
+  align-items:center;justify-content:center}
+.embarque .lecture[data-on="1"]{background:var(--brique)}
+.embarque .tempo{font-family:var(--serif);font-size:1.85rem;font-weight:600;line-height:1;min-width:66px}
+.embarque .tempo i{font-family:var(--sans);font-style:normal;font-size:.6rem;color:var(--encre-doux);
+  letter-spacing:.1em;text-transform:uppercase}
+.embarque .pm{display:flex;gap:5px;margin-left:auto}
+.embarque .pm button{appearance:none;border:1px solid var(--creme3);background:#FFFDF8;color:var(--encre);
+  width:38px;height:38px;border-radius:var(--rayon);font-size:.95rem;cursor:pointer;font-family:var(--sans)}
+.temps-ligne{display:flex;gap:5px;margin-top:9px}
+.temps-ligne i{flex:1;height:7px;border-radius:4px;background:var(--creme3);transition:background .05s}
+.temps-ligne i.accent{background:#CDBB98}
+.temps-ligne i.on{background:var(--encre)}
+.temps-ligne i.on.accent{background:var(--or)}
+.temps-ligne i.muet{background:repeating-linear-gradient(90deg,var(--creme3) 0 3px,transparent 3px 6px)}
+.embarque .reglages{font-size:.72rem;color:var(--encre-doux);margin-top:7px;line-height:1.45}
+.embarque .reglages b{color:var(--sepia);font-weight:600}
+
+.bloc-seance{display:flex;gap:11px;align-items:flex-start;padding:10px 0;border-bottom:1px solid var(--creme3)}
+.bloc-seance:last-child{border-bottom:0}
+.bloc-seance .duree{font-family:var(--serif);font-size:1.45rem;font-weight:600;min-width:54px;text-align:right;line-height:1.1}
+.bloc-seance .duree i{font-family:var(--sans);font-style:normal;font-size:.6rem;color:var(--encre-doux)}
+.bloc-seance .corps{flex:1}
+.bloc-seance .corps b{font-weight:600;font-size:.93rem}
+.bloc-seance .corps small{display:block;margin-top:2px;line-height:1.35}
+.bloc-seance.fait{opacity:.45}
+.bloc-seance.encours{background:linear-gradient(90deg,rgba(184,137,43,.13),transparent);margin:0 -8px;padding:10px 8px}
+.chrono{font-family:var(--serif);font-size:3.8rem;font-weight:600;line-height:1;text-align:center}
+.chrono.fini{color:var(--brique)}
+.barre{height:4px;background:var(--creme3);border-radius:2px;overflow:hidden;margin:9px 0}
+.barre i{display:block;height:100%;background:var(--or);width:0;transition:width .4s linear}
+
+.item{border-bottom:1px solid var(--creme3);padding:9px 0;display:flex;gap:9px;align-items:flex-start;cursor:pointer}
+.item:last-child{border-bottom:0}
+.item .t{flex:1;min-width:0}
+.item .t b{font-weight:500;font-size:.92rem}
+.item .t small{display:block}
+.badge{font-size:.62rem;text-transform:uppercase;letter-spacing:.08em;padding:2px 6px;border-radius:2px;
+  font-weight:600;white-space:nowrap}
+.badge.neuf{background:var(--vert);color:#fff}
+.badge.du{background:var(--brique);color:#fff}
+.badge.entretien{background:var(--bleu);color:#fff}
+.badge.plus-tard{background:var(--creme3);color:var(--encre-doux)}
+.badge.type{background:var(--creme2);color:var(--sepia)}
+.badge.med{background:var(--or);color:#fff}
+
+.revision .consigne{font-family:var(--serif);font-size:1.45rem;line-height:1.28;margin:9px 0}
+.revision .critere{background:var(--creme2);border-radius:var(--rayon);padding:11px;margin:11px 0;font-size:.9rem}
+.notes{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-top:11px}
+.notes button{appearance:none;border:1px solid var(--creme3);background:#FFFDF8;border-radius:var(--rayon);
+  padding:8px 3px;cursor:pointer;min-height:52px;font-family:var(--sans);font-size:.76rem;font-weight:500;
+  color:var(--encre);display:flex;flex-direction:column;gap:2px;align-items:center;justify-content:center}
+.notes button i{font-style:normal;font-size:.62rem;color:var(--encre-doux)}
+.notes button[data-q="0"]{border-color:var(--brique);color:var(--brique)}
+.notes button[data-q="3"]{border-color:var(--vert);color:var(--vert)}
+.rythme{font-family:var(--serif);font-size:1.6rem;letter-spacing:.2em;line-height:1.6}
+.rappel{background:rgba(63,90,107,.1);border-left:3px solid var(--bleu);padding:8px 10px;margin:9px 0;font-size:.82rem}
+
+.piece{background:linear-gradient(180deg,rgba(184,137,43,.09),transparent);border:1px solid var(--creme3);
+  border-left:3px solid var(--or);border-radius:var(--rayon);padding:11px 12px;margin-top:10px}
+.grille{font-family:var(--serif);font-size:1.05rem;line-height:1.9;letter-spacing:.03em;margin:6px 0}
+.grille span{display:inline-block;min-width:3.1em;border-bottom:1px solid var(--creme3);margin-right:3px}
+
+.terme{border-bottom:1px dotted var(--or);cursor:pointer;color:inherit;background:none;border-left:0;
+  border-right:0;border-top:0;padding:0;font:inherit;text-align:left}
+#tiroir{position:fixed;inset:auto 0 0 0;z-index:60;background:#FBF7EE;border-top:2px solid var(--or);
+  border-radius:8px 8px 0 0;padding:17px 18px calc(22px + env(safe-area-inset-bottom));max-height:78vh;
+  overflow-y:auto;transform:translateY(101%);transition:transform .22s ease-out;box-shadow:0 -6px 24px rgba(43,35,32,.16)}
+#tiroir.ouvert{transform:none}
+#voile{position:fixed;inset:0;background:rgba(43,35,32,.32);z-index:55;display:none}
+#voile.ouvert{display:block}
+.vide{text-align:center;color:var(--encre-doux);padding:24px 10px;font-size:.88rem}
+.spark{width:100%;height:56px;display:block}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+:focus-visible{outline:2px solid var(--or);outline-offset:2px}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="marque">comp<em>ing</em></div>
+  <div class="jour" id="entete-jour"></div>
+</header>
+
+<main>
+
+<!-- ═══ SÉANCE ═══ -->
+<section class="vue actif" id="vue-seance">
+  <h1>Séance du jour</h1>
+  <p><small>Fixe la durée : le plan et le rythme d'introduction en découlent.</small></p>
+
+  <div class="carte">
+    <div class="rang"><span class="etiquette">Durée totale</span>
+      <span class="bpm-affiche" style="font-size:1.9rem" id="duree-lue">25<sup> min</sup></span></div>
+    <input type="range" id="duree" min="8" max="75" step="1" value="25">
+    <div class="puces" id="raccourcis-duree"></div>
+  </div>
+
+  <div class="carte souligne">
+    <span class="etiquette">Suggestion de progression</span>
+    <p id="suggestion" style="margin-top:5px"></p>
+  </div>
+
+  <h2 style="margin-top:18px">Plan</h2>
+  <div class="carte" id="plan"></div>
+
+  <div class="ligne-b" style="margin-top:13px">
+    <button class="b or" id="lancer-seance">Lancer la séance</button>
+    <button class="b creux petit" id="reinit-seance">Réinitialiser</button>
+  </div>
+
+  <div id="deroule" style="display:none">
+    <hr>
+    <span class="etiquette" id="bloc-nom"></span>
+    <div class="chrono" id="chrono">00:00</div>
+    <div class="barre"><i id="barre-bloc"></i></div>
+    <p id="bloc-detail" style="min-height:3em"></p>
+    <div class="ligne-b">
+      <button class="b" id="pause-bloc">Pause</button>
+      <button class="b creux" id="suivant-bloc">Bloc suivant</button>
+      <button class="b creux petit" id="stop-seance">Arrêter</button>
+    </div>
+  </div>
+</section>
+
+<!-- ═══ CHAPITRES ═══ -->
+<section class="vue" id="vue-chapitres">
+  <h1>Chapitres</h1>
+  <p><small>Ordonnés par difficulté. Chaque chapitre isole une difficulté et se conclut par une pièce choisie pour elle.</small></p>
+  <div id="liste-chapitres"></div>
+</section>
+
+<!-- ═══ MÉTRONOME ═══ -->
+<section class="vue" id="vue-metro">
+  <h1>Métronome</h1>
+  <div class="scene">
+    <canvas id="cadran" width="280" height="280" aria-label="Cadran de mesure"></canvas>
+    <div class="bpm-affiche"><span id="bpm-lu">80</span><sup> bpm</sup></div>
+    <div class="compteur" id="compteur">mesure 0</div>
+  </div>
+  <div class="ligne-b" style="justify-content:center;margin-bottom:9px">
+    <button class="b creux petit" data-bpm="-5">−5</button>
+    <button class="b creux petit" data-bpm="-1">−1</button>
+    <button class="b or" id="jouer" style="min-width:116px">Démarrer</button>
+    <button class="b creux petit" data-bpm="1">+1</button>
+    <button class="b creux petit" data-bpm="5">+5</button>
+  </div>
+  <input type="range" id="bpm" min="30" max="240" step="1" value="80">
+  <div class="ligne-b" style="justify-content:center">
+    <button class="b creux petit" id="tap">Tap tempo</button>
+  </div>
+
+  <div class="carte">
+    <span class="etiquette">Mesure</span><div class="puces" id="choix-temps"></div>
+    <span class="etiquette" style="display:block;margin-top:9px">Subdivision</span><div class="puces" id="choix-sub"></div>
+    <label class="bascule"><input type="checkbox" id="swing">
+      <span><button class="terme" data-terme="swing">Croches swinguées</button> — rapport 2:1</span></label>
+    <label class="bascule"><input type="checkbox" id="jazz">
+      <span><button class="terme" data-terme="backbeat">Accent sur 2 et 4</button></span></label>
+  </div>
+  <div class="carte">
+    <label class="bascule"><input type="checkbox" id="gap">
+      <span><button class="terme" data-terme="fantome">Trous silencieux</button></span></label>
+    <div id="gap-reglages" style="display:none">
+      <div style="display:flex;gap:10px">
+        <label class="champ" style="flex:1"><span>Mesures jouées</span><input type="number" id="gap-jouees" min="1" max="16" value="2"></label>
+        <label class="champ" style="flex:1"><span>Mesures muettes</span><input type="number" id="gap-muettes" min="1" max="16" value="2"></label>
+      </div>
+    </div>
+  </div>
+  <div class="carte">
+    <label class="bascule"><input type="checkbox" id="ramp"><span>Tempo progressif</span></label>
+    <div id="ramp-reglages" style="display:none">
+      <div style="display:flex;gap:10px">
+        <label class="champ" style="flex:1"><span>Toutes les… mesures</span><input type="number" id="ramp-tous" min="1" max="64" value="8"></label>
+        <label class="champ" style="flex:1"><span>+ bpm</span><input type="number" id="ramp-pas" min="1" max="20" value="2"></label>
+        <label class="champ" style="flex:1"><span>Plafond</span><input type="number" id="ramp-max" min="40" max="300" value="140"></label>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══ CARTES ═══ -->
+<section class="vue" id="vue-cartes">
+  <h1>Cartes</h1>
+
+  <div id="zone-revision" style="display:none">
+    <div class="carte souligne revision">
+      <div class="rang"><span class="etiquette" id="rev-type"></span><small id="rev-reste"></small></div>
+      <div class="consigne" id="rev-consigne"></div>
+      <div id="rev-rythme" class="rythme"></div>
+      <div id="rev-metro"></div>
+      <small id="rev-chapitre"></small>
+      <div class="critere" id="rev-critere" style="display:none"></div>
+      <div id="rev-rappel"></div>
+      <div id="rev-avant"><button class="b" id="voir-critere" style="margin-top:11px">Voir le critère</button></div>
+      <div id="rev-apres" style="display:none">
+        <div class="notes">
+          <button data-q="0">Encore<i id="i0"></i></button>
+          <button data-q="1">Dur<i id="i1"></i></button>
+          <button data-q="2">Bien<i id="i2"></i></button>
+          <button data-q="3">Facile<i id="i3"></i></button>
+        </div>
+        <small style="display:block;margin-top:7px">Le tempo retenu est celui du métronome ci-dessus.</small>
+      </div>
+    </div>
+  </div>
+
+  <div id="zone-liste">
+    <div class="carte">
+      <div class="rang">
+        <div><b id="compte-dues">0</b> <small>dans la file du jour</small></div>
+        <button class="b or petit" id="reviser">Réviser</button>
+      </div>
+      <small id="detail-file"></small>
+    </div>
+    <div class="puces" id="filtres"></div>
+    <div class="carte" id="liste-cartes"></div>
+    <details class="carte">
+      <summary style="cursor:pointer;font-weight:500">Ajouter une carte</summary>
+      <label class="champ"><span>Titre</span><input type="text" id="n-titre" placeholder="Transition Ré m → Sol7"></label>
+      <label class="champ"><span>Consigne</span><textarea id="n-consigne"></textarea></label>
+      <label class="champ"><span>Critère de réussite</span><textarea id="n-critere"></textarea></label>
+      <div style="display:flex;gap:10px">
+        <label class="champ" style="flex:1"><span>Type</span>
+          <select id="n-type"><option value="transition">transition</option><option value="rythme">rythme</option>
+          <option value="mediator">médiator</option><option value="notion">notion</option>
+          <option value="piece">pièce</option><option value="voicing">voicing</option></select></label>
+        <label class="champ" style="flex:1"><span>Tempo cible</span><input type="number" id="n-bpm" value="80"></label>
+      </div>
+      <label class="champ"><span>Notation rythmique (facultatif)</span><input type="text" id="n-rythme" placeholder="↓ ↓↑ ·↑ ↓↑"></label>
+      <button class="b" id="ajouter-carte">Ajouter</button>
+    </details>
+  </div>
+</section>
+
+<!-- ═══ JOURNAL ═══ -->
+<section class="vue" id="vue-journal">
+  <h1>Journal</h1>
+  <div class="carte">
+    <span class="etiquette">Minutes travaillées — 30 derniers jours</span>
+    <canvas class="spark" id="spark" width="600" height="112"></canvas>
+    <div class="rang" style="margin-top:8px">
+      <div><b id="stat-serie">0</b> <small>jours d'affilée</small></div>
+      <div><b id="stat-total">0</b> <small>séances</small></div>
+      <div><b id="stat-min">0</b> <small>min</small></div>
+    </div>
+  </div>
+  <div class="carte">
+    <span class="etiquette">Entretien de l'acquis</span>
+    <p id="stat-entretien" style="margin-top:5px;font-size:.9rem"></p>
+  </div>
+  <div class="carte" id="liste-journal"></div>
+  <hr>
+  <div class="ligne-b">
+    <button class="b creux petit" id="exporter">Exporter</button>
+    <button class="b creux petit" id="importer">Importer</button>
+    <button class="b creux petit" id="tout-effacer">Tout effacer</button>
+  </div>
+  <input type="file" id="fichier-import" accept="application/json" hidden>
+  <p><small>Tout est stocké dans ce navigateur (<code>localStorage</code>).</small></p>
+</section>
+
+</main>
+
+<nav>
+  <button data-vue="seance" aria-current="page"><span class="ico">◔</span>Séance</button>
+  <button data-vue="chapitres"><span class="ico">▥</span>Chapitres</button>
+  <button data-vue="metro"><span class="ico">◉</span>Métro</button>
+  <button data-vue="cartes"><span class="ico">▤</span>Cartes<span class="pastille" id="pastille" hidden></span></button>
+  <button data-vue="journal"><span class="ico">◫</span>Journal</button>
+</nav>
+
+<div id="voile"></div>
+<div id="tiroir" role="dialog" aria-modal="true">
+  <h3 id="tiroir-titre"></h3>
+  <div id="tiroir-corps"></div>
+  <button class="b creux petit" id="fermer-tiroir" style="margin-top:13px">Fermer</button>
+</div>
+
+<script>
+"use strict";
+
+/* ═══════════════════════════════════════════════════════════
+   1 · CONSTANTES PÉDAGOGIQUES
+   ═══════════════════════════════════════════════════════════ */
+const CLE = "comping_v2";
+const PLAFOND_INTERVALLE = 90;   // jours — rien ne sort jamais de la rotation
+const SEUIL_ENTRETIEN    = 45;   // au-delà : régime d'entretien
+const CREDIT_RAPPEL      = 1.15; // extension d'un prérequis rejoué en contexte
+
+const GLOSSAIRE = {
+  swing:{t:"Croches swinguées",c:"Deux croches ne durent pas le même temps : la première occupe environ deux tiers du temps, la seconde un tiers. Plus le tempo monte, plus le rapport s'aplatit vers l'égalité. Ici le clic place la croche faible aux deux tiers du temps."},
+  backbeat:{t:"Accent sur 2 et 4",c:"Le métronome ne sonne que sur 2 et 4 : c'est toi qui portes le 1, pas la machine. C'est l'exercice qui sépare le guitariste qui suit le tempo de celui qui le tient. Au début tu perdras le fil au bout de quatre mesures — c'est précisément la compétence à construire."},
+  fantome:{t:"Cordes fantômes et trous silencieux",c:"La main droite ne s'arrête jamais, même sur les temps sans son : elle survole les cordes. Le geste devient un pendule et le rythme cesse d'être une suite de décisions.<br><br>Les trous silencieux prolongent l'idée : le clic se tait pendant N mesures, le temps continue. Si tu es en place au retour du clic, ton tempo interne existe."},
+  srs:{t:"Révision espacée",c:"Chaque item porte son calendrier. Réussi facilement, il revient plus tard ; raté, il revient tout de suite. Tu ne révises jamais ce qui est acquis, seulement ce qui est en train de s'effacer."},
+  recursivite:{t:"Comment l'acquis ne disparaît pas",c:"Quatre mécanismes, tous visibles dans l'app.<br><br><b>1 · Plafond d'intervalle.</b> Aucune carte ne dépasse 90 jours d'écart. Même parfaitement maîtrisé, un item repasse au moins une fois par trimestre : rien ne quitte définitivement la rotation.<br><br><b>2 · Rappel contextuel.</b> Chaque carte déclare ses prérequis. Quand tu réussis un exercice avancé, ses prérequis reçoivent un crédit : leur échéance recule de 15 %, parce qu'ils viennent d'être réellement joués — à l'intérieur du nouvel exercice. L'ancien reste vivant sans être redrillé à vide. C'est la récursivité : le neuf entretient le vieux.<br><br><b>3 · Entrelacement.</b> La file du jour alterne les types au lieu de les grouper. On progresse moins vite dans la séance, nettement mieux d'une semaine sur l'autre.<br><br><b>4 · Brassage.</b> S'il reste de la place, la séance repêche les items les plus anciennement revus, même non dus. Filet de sécurité contre les trous du calendrier."},
+  mediator:{t:"Venir de la guitare classique",c:"Ton acquis classique est un atout et un piège.<br><br><b>L'atout</b> : tu connais déjà l'appui (butée). Le médiator fait exactement le même geste — il s'arrête contre la corde voisine au lieu de rebondir. Tu n'as pas à découvrir la sensation, seulement à la transférer à un objet rigide.<br><br><b>Le piège</b> : en classique, les cordes non jouées sont occupées par les doigts. Au médiator, rien ne les occupe : l'étouffement devient une tâche à part entière, partagée entre la paume droite et les doigts gauches posés à plat. C'est ce qui te manquera d'abord — pas la vitesse.<br><br><b>La pression</b> : le classique demande un doigt ferme qui prépare. Le médiator demande la pression la plus faible qui ne le fasse pas tourner. Si l'avant-bras chauffe, tu serres trop."},
+  inside:{t:"Inside et outside picking",c:"Sur deux cordes voisines, l'aller-retour produit deux situations distinctes.<br><br><b>Outside</b> : le médiator attaque par l'extérieur de la paire. Le mouvement est ample, plutôt confortable.<br><br><b>Inside</b> : il doit passer entre les deux cordes et changer de sens dans un espace fermé. C'est le cas difficile, celui qui plafonne la vitesse. On les travaille séparément — mélangés trop tôt, le bras compense et l'erreur s'installe."}
+};
+
+/* ── chapitres : difficulté croissante, une pièce d'application chacun ── */
+const CHAPITRES = [
+ {id:0,palier:0,titre:"Le pendule",focus:"Le geste continu de la main droite, avant toute question d'accord.",
+  piece:{titre:"Boucle Lam – Sol",grille:["Am","Am","G","G"],mesure:"4/4",
+    pourquoi:"Deux accords que tu tiens déjà sans y penser : tout l'effort disponible passe dans la main droite, aucun dans la gauche."}},
+ {id:1,palier:1,titre:"Accords ouverts en place",focus:"Transitions sans rupture du battement, aux doigts.",
+  piece:{titre:"Blues 12 mesures en La",grille:["A7","A7","A7","A7","D7","D7","A7","A7","E7","D7","A7","E7"],mesure:"4/4",
+    pourquoi:"Forme traditionnelle qui n'emploie que trois septièmes ouvertes déjà acquises, mais impose onze changements par grille : c'est un test d'endurance de transition, pas de vocabulaire."}},
+ {id:2,palier:1,titre:"Prise du médiator",focus:"Tenue, pression, angle, attaque descendante seule, étouffement des voisines.",
+  piece:{titre:"« Ah ! vous dirai-je, maman » (trad., domaine public)",grille:["C","C","F","C","F","C","G7","C"],mesure:"4/4",
+    pourquoi:"Mélodie que tu connais par cœur : la main gauche est en pilotage automatique, donc toute l'attention reste disponible pour la main droite. Une note par temps, aucune vitesse."}},
+ {id:3,palier:2,titre:"L'aller-retour",focus:"Alternance stricte, changement de corde, inside et outside picking.",
+  piece:{titre:"« Scarborough Fair » (trad., domaine public)",grille:["Am","Am","G","Am","Am","C","Am","Am"],mesure:"3/4",
+    pourquoi:"Mélodie qui traverse trois cordes en croches continues, et en 3/4 : l'alternance ne peut pas se caler paresseusement sur une pulsation binaire, elle doit rester indépendante du temps fort."}},
+ {id:4,palier:2,titre:"Le trou et la syncope",focus:"Patrons à frappe manquante, anticipation du changement d'accord.",
+  piece:{titre:"« House of the Rising Sun » (trad., domaine public)",grille:["Am","C","D","F","Am","C","E","E"],mesure:"6/8",
+    pourquoi:"Cycle régulier en 6/8 sur huit accords : l'anticipation du changement s'entend immédiatement, et la mesure ternaire interdit de compter en croches binaires."}},
+ {id:5,palier:2,titre:"Palm mute et dynamique",focus:"Étouffement à la paume, accents, nuances, hybride médiator et doigts.",
+  piece:{titre:"Shuffle en Mi (forme blues traditionnelle)",grille:["E5","E5","A5","E5","B5","A5","E5","B5"],mesure:"4/4",
+    pourquoi:"Le riff en quintes ne mobilise que deux doigts à la main gauche : tout le contenu musical est produit par l'étouffement et l'accentuation, donc par la seule main droite."}},
+ {id:6,palier:3,titre:"Barrés et formes mobiles",focus:"Formes de Mi et de La transposées, endurance de la main gauche.",
+  piece:{titre:"Blues 12 mesures en Sol, tout en barrés",grille:["G7","G7","G7","G7","C7","C7","G7","G7","D7","C7","G7","D7"],mesure:"4/4",
+    pourquoi:"Exactement la grille du chapitre 1, transposée dans une tonalité sans accords ouverts : la main droite est déjà résolue, la seule variable neuve est la main gauche."},avenir:true},
+ {id:7,palier:3,titre:"Shell voicings",focus:"Réduction à fondamentale, tierce et septième (R-3-7 et R-7-3).",
+  piece:{titre:"Anatole I – VI – II – V en Do",grille:["C","Am7","Dm7","G7"],mesure:"4/4",
+    pourquoi:"Quatre accords par cycle, puis deux par mesure : à ce débit l'accord à six cordes devient physiquement impossible. La réduction à trois sons cesse d'être une élégance et devient la seule solution."},avenir:true},
+ {id:8,palier:4,titre:"Freddie Green",focus:"Quatre noires, trois sons, aucune résonance parasite.",
+  piece:{titre:"Rhythm changes, section A en Si♭",grille:["Bb6","Gm7","Cm7","F7","Dm7","G7","Cm7","F7"],mesure:"4/4",
+    pourquoi:"Deux accords par mesure sur toute la section : le débit harmonique interdit tout accord large et force la main droite à une régularité de métronome."},avenir:true},
+ {id:9,palier:4,titre:"Charleston et comping",focus:"Placement rythmique, ii-V-I majeur et mineur, respiration.",
+  piece:{titre:"Un standard ii-V-I de ton recueil",grille:[],mesure:"4/4",
+    pourquoi:"Premier morceau où le rythme n'est plus donné mais choisi : il faut laisser de la place au soliste. Utilise ta propre grille — l'app ne reproduit pas de partition sous droits."},avenir:true},
+ {id:10,palier:5,titre:"Drop 2 et drop 3",focus:"Renversements sur cordes adjacentes, conduite des voix.",
+  piece:{titre:"Une ballade lente de ton recueil",grille:[],mesure:"4/4",
+    pourquoi:"Le tempo lent rend chaque mouvement de voix audible : c'est la seule vitesse à laquelle on entend ses propres erreurs de conduite."},avenir:true},
+ {id:11,palier:6,titre:"Modes et improvisation",focus:"Modes rattachés aux fonctions, mineure mélodique.",
+  piece:{titre:"ii-V-I en boucle, toutes tonalités",grille:["Dm7","G7","CMaj7","CMaj7"],mesure:"4/4",
+    pourquoi:"Support minimal et infiniment répétable : le mode cesse d'être une gamme à réciter pour devenir une couleur choisie sur une fonction précise."},avenir:true}
+];
+
+/* ── corpus : C(id, chapitre, type, main, titre, consigne, critère, bpm, opts) ── */
+function C(id,ch,type,main,titre,consigne,critere,bpm,opts){
+  opts = opts||{};
+  const base = {bpm,temps:4,sub:1,swing:false,jazz:false,gap:false,gapJouees:2,gapMuettes:2,
+                ramp:false,rampTous:8,rampPas:2,rampMax:bpm+30};
+  return {id,chapitre:ch,type,main,titre,consigne,critere,bpmCible:bpm,
+    rythme:opts.r||"",requiert:opts.req||[],preset:Object.assign(base,opts.p||{})};
+}
+
+const CORPUS = [
+ /* ── Ch.0 · le pendule ── */
+ C("pendule",0,"notion","doigts","Le pendule",
+   "Main droite en va-et-vient continu sur Lam. Une mesure jouée, une mesure où la main poursuit son mouvement sans toucher les cordes.",
+   "8 mesures alternées, la reprise tombe exactement sur le 1, sans hésitation ni accélération.",70,
+   {p:{sub:2,gap:true,gapJouees:2,gapMuettes:2}}),
+ C("deux-quatre",0,"notion","doigts","Clic sur 2 et 4",
+   "Métronome sur les seuls temps 2 et 4. Quatre noires par mesure sur Lam.",
+   "16 mesures d'affilée sans que le clic ne bascule sur le 1. Si tu perds le repère, tu recommences le décompte.",70,
+   {p:{jazz:true}}),
+ C("economie",0,"notion","doigts","Économie de mouvement",
+   "Sur Mi, joue en croches en réduisant l'amplitude du poignet au strict nécessaire.",
+   "La main ne dépasse pas la hauteur des cordes voisines et le son reste égal du grave à l'aigu.",80,{p:{sub:2}}),
+ C("noires",0,"rythme","doigts","Quatre noires",
+   "Quatre frappes descendantes, une par temps. Rien d'autre.",
+   "32 mesures d'affilée, volume constant, aucune dérive de tempo.",80,{r:"↓ ↓ ↓ ↓"}),
+ C("tempo-interne",0,"notion","doigts","Tempo interne",
+   "Trous silencieux : le clic disparaît deux mesures sur quatre. Continue seul, retrouve-le au retour.",
+   "Quatre retours consécutifs où tu es encore exactement sur le temps.",70,
+   {p:{gap:true,gapJouees:2,gapMuettes:2},req:["pendule","deux-quatre"]}),
+
+ /* ── Ch.1 · accords ouverts ── */
+ C("mi-la",1,"transition","doigts","Mi ↔ La","Change toutes les deux mesures, en noires, sans rupture du battement.",
+   "8 changements consécutifs, aucun temps mangé au moment du changement.",70,{req:["noires"]}),
+ C("la-re",1,"transition","doigts","La ↔ Ré","Change toutes les deux mesures, en noires.",
+   "8 changements consécutifs, le premier temps du nouvel accord sonne plein.",70,{req:["noires"]}),
+ C("re-sol",1,"transition","doigts","Ré ↔ Sol","Change toutes les deux mesures, en noires.",
+   "8 changements consécutifs, la basse du nouvel accord est franche.",70,{req:["noires"]}),
+ C("sol-do",1,"transition","doigts","Sol ↔ Do","Change toutes les deux mesures, en noires.",
+   "8 changements consécutifs sans regarder la main gauche.",65,{req:["noires"]}),
+ C("do-lam",1,"transition","doigts","Do ↔ Lam","Change toutes les deux mesures. Repère le doigt qui ne bouge pas.",
+   "8 changements, le doigt pivot reste posé en permanence.",80),
+ C("lam-mim",1,"transition","doigts","Lam ↔ Mim","Change toutes les deux mesures, en croches.",
+   "8 changements, aucune corde étouffée à la jonction.",75,{p:{sub:2}}),
+ C("mim-re",1,"transition","doigts","Mim ↔ Ré","Change toutes les deux mesures. Cherche l'appui commun.",
+   "8 changements en croches continues.",75,{p:{sub:2}}),
+ C("mi7-la",1,"transition","doigts","Mi7 → La","Une mesure de Mi7, une mesure de La. Cadence de dominante.",
+   "8 cycles, la résolution tombe pile sur le 1.",70,{req:["mi-la"]}),
+ C("la7-re",1,"transition","doigts","La7 → Ré","Une mesure de La7, une mesure de Ré.",
+   "8 cycles, la septième reste audible avant la résolution.",70,{req:["la-re"]}),
+ C("si7-mim",1,"transition","doigts","Si7 → Mim","Une mesure de Si7, une mesure de Mim. Cadence mineure.",
+   "8 cycles sans ralentir sur le Si7.",65),
+ C("sol7-do",1,"transition","doigts","Sol7 → Do","Une mesure de Sol7, une mesure de Do.",
+   "8 cycles, changement propre malgré le déplacement de l'annulaire.",70,{req:["sol-do"]}),
+ C("blues-la",1,"piece","doigts","Blues 12 mesures en La",
+   "La grille entière en quatre noires par mesure. Sans arrêt, quel que soit l'accroc.",
+   "3 grilles enchaînées sans interruption du battement, à 80 bpm.",80,
+   {req:["mi7-la","la7-re","noires"]}),
+
+ /* ── Ch.2 · prise du médiator ── */
+ C("med-tenue",2,"mediator","mediator","Tenue du médiator",
+   "Médiator entre le pouce et le côté de l'index replié, 3 à 5 mm dépassent. Joue la corde de La à vide, en noires.",
+   "Après 2 minutes de jeu continu, le médiator n'a pas tourné et tu ne l'as pas rattrapé.",60),
+ C("med-pression",2,"mediator","mediator","Pression minimale",
+   "Même exercice, en cherchant la pression la plus faible qui ne le fasse pas glisser.",
+   "16 mesures : l'avant-bras reste froid et souple. S'il chauffe, tu serres trop.",60,{req:["med-tenue"]}),
+ C("med-appui",2,"mediator","mediator","L'appui, transposé du classique",
+   "Attaque descendante seule sur la corde de La. Le médiator s'arrête contre la corde de Ré au lieu de rebondir — c'est exactement le geste de butée que ton index connaît déjà.",
+   "16 frappes consécutives qui s'arrêtent toutes sur la corde voisine, son plein et égal.",60,{req:["med-tenue"]}),
+ C("med-angle",2,"mediator","mediator","Angle d'attaque",
+   "Incline le médiator d'environ 30° au lieu de l'attaquer à plat. Compare les deux, huit mesures chacun.",
+   "Tu identifies à l'oreille lequel accroche et lequel glisse, et tu tiens l'angle incliné 16 mesures.",70,{req:["med-appui"]}),
+ C("med-etouffe",2,"mediator","mediator","Étouffer les voisines",
+   "Corde de Ré seule, en noires. La et Sol doivent rester muettes : paume droite posée sur les graves, doigts gauches à plat sur les aiguës.",
+   "16 frappes sans qu'aucune corde voisine ne sonne — vérifié en levant la main gauche à la fin.",65,{req:["med-appui"]}),
+ C("med-traversee",2,"mediator","mediator","Traversée des cordes",
+   "Descendantes seules, une note par temps, de la corde de Mi grave à la Mi aiguë puis retour.",
+   "4 allers-retours complets sans rater de corde ni casser le tempo.",65,{req:["med-etouffe"]}),
+ C("med-melodie",2,"piece","mediator","« Ah ! vous dirai-je, maman »",
+   "La mélodie en noires, médiator, descendantes seulement, sur les cordes de Sol et Si.",
+   "La mélodie entière deux fois de suite à 70 bpm, sans arrêt et sans corde parasite.",70,
+   {req:["med-traversee","med-angle"]}),
+
+ /* ── Ch.3 · aller-retour ── */
+ C("ar-vide",3,"mediator","mediator","Aller-retour, corde à vide",
+   "Alternance stricte bas-haut en croches sur la corde de La à vide.",
+   "32 mesures, la frappe montante sonne aussi fort que la descendante.",70,
+   {r:"↓↑ ↓↑ ↓↑ ↓↑",p:{sub:2},req:["med-appui"]}),
+ C("ar-24",3,"mediator","mediator","Aller-retour sur 2 et 4",
+   "Même alternance, mais le métronome ne sonne que sur 2 et 4.",
+   "16 mesures sans dérive, la descendante reste sur les temps.",75,
+   {p:{sub:2,jazz:true},req:["ar-vide","deux-quatre"]}),
+ C("ar-outside",3,"mediator","mediator","Outside picking",
+   "Deux cordes voisines, deux notes chacune, attaque par l'extérieur de la paire.",
+   "16 mesures en croches, aucune hésitation au changement de corde.",70,
+   {p:{sub:2},req:["ar-vide"]}),
+ C("ar-inside",3,"mediator","mediator","Inside picking",
+   "Même figure inversée : le médiator doit changer de sens entre les deux cordes.",
+   "16 mesures en croches, à la même vitesse que l'outside — c'est le cas difficile.",65,
+   {p:{sub:2},req:["ar-outside"]}),
+ C("ar-gamme",3,"mediator","mediator","Gamme de Do en aller-retour",
+   "Une octave montante et descendante, croches, alternance stricte sans exception.",
+   "8 allers-retours, l'alternance n'est jamais rompue au changement de corde.",70,
+   {p:{sub:2},req:["ar-inside","med-traversee"]}),
+ C("ar-triolets",3,"mediator","mediator","Triolets : l'accent se déplace",
+   "Trois notes par temps en alternance stricte. Le premier de chaque groupe tombe alternativement sur une descendante et une montante.",
+   "16 mesures, l'accent reste sur le premier du groupe malgré le changement de sens.",60,
+   {p:{sub:3},req:["ar-gamme"]}),
+ C("ar-doubles",3,"mediator","mediator","Doubles-croches",
+   "Quatre notes par temps sur une corde. Tempo progressif de 60 à 100.",
+   "Le tempo progressif atteint 100 bpm sans que l'alternance ne se rompe.",60,
+   {p:{sub:4,ramp:true,rampTous:8,rampPas:4,rampMax:100},req:["ar-gamme"]}),
+ C("ar-saut",3,"mediator","mediator","Saut de corde",
+   "La corde de La puis celle de Sol, en évitant celle de Ré, en croches alternées.",
+   "16 mesures sans effleurer la corde sautée.",60,{p:{sub:2},req:["ar-inside","med-etouffe"]}),
+ C("scarborough",3,"piece","mediator","« Scarborough Fair »",
+   "Mélodie au médiator, aller-retour strict, en 3/4.",
+   "Deux tours complets à 80 bpm sans rupture d'alternance.",80,
+   {p:{temps:3,sub:2},req:["ar-gamme","ar-saut"]}),
+
+ /* ── Ch.4 · trou et syncope ── */
+ C("croches",4,"rythme","doigts","Croches continues",
+   "Alternance bas-haut sur chaque temps, régulière, sur un seul accord.",
+   "16 mesures, le haut sonne aussi fort que le bas.",75,{r:"↓↑ ↓↑ ↓↑ ↓↑",p:{sub:2},req:["noires"]}),
+ C("patron-trou",4,"rythme","doigts","Le patron à trou",
+   "Bas, bas-haut, haut, bas-haut. Le troisième temps n'a pas de frappe descendante : la main y passe à vide.",
+   "16 mesures, le trou reste un trou — la main descend sans toucher les cordes.",70,
+   {r:"↓ ↓↑ ·↑ ↓↑",p:{sub:2},req:["croches","pendule"]}),
+ C("anticipation",4,"rythme","doigts","Anticipation du temps 3",
+   "L'accord suivant est frappé sur le « et » du temps 2, puis tenu.",
+   "8 mesures, l'anticipation ne raccourcit pas la mesure d'une croche.",70,
+   {r:"↓ ↓·↑ · ·",p:{sub:2},req:["patron-trou"]}),
+ C("syncope-24",4,"rythme","doigts","Syncope contre 2 et 4",
+   "Patron à trou, métronome sur 2 et 4 seulement.",
+   "16 mesures sans que le repère ne bascule.",70,{p:{sub:2,jazz:true},req:["patron-trou","deux-quatre"]}),
+ C("six-huit",4,"rythme","doigts","Balancement en 6/8",
+   "Arpège descendant régulier, six croches par mesure, accent sur 1 et 4.",
+   "16 mesures sans retomber dans un comptage binaire.",60,{p:{temps:6}}),
+ C("rising-sun",4,"piece","doigts","« House of the Rising Sun »",
+   "Cycle complet en 6/8, arpège régulier, changement d'accord anticipé.",
+   "3 cycles enchaînés à 65 bpm, les changements tombent tous sur le 1.",65,
+   {p:{temps:6},req:["six-huit","anticipation","lam-mim"]}),
+
+ /* ── Ch.5 · palm mute et dynamique ── */
+ C("pm-base",5,"mediator","mediator","Palm mute",
+   "Paume droite posée au ras du chevalet sur les trois cordes graves. Noires, médiator.",
+   "16 mesures, son court et sourd mais la note reste identifiable.",70,{req:["med-etouffe"]}),
+ C("pm-alterne",5,"mediator","mediator","Mute et ouvert",
+   "Deux mesures étouffées, deux mesures ouvertes, sans changer de tempo ni de volume.",
+   "8 alternances, la bascule est nette et tombe sur le 1.",70,{req:["pm-base"]}),
+ C("accent-1",5,"rythme","mediator","Accent sur le 1 seul",
+   "Croches continues à volume faible, sauf le premier temps, franchement accentué.",
+   "16 mesures, l'écart de volume est audible sans que le tempo bouge.",75,{p:{sub:2},req:["croches"]}),
+ C("crescendo",5,"rythme","mediator","Crescendo sur 4 mesures",
+   "Quatre mesures de croches du plus faible au plus fort, puis retour immédiat au plus faible.",
+   "4 cycles, la progression est continue et le retour n'est pas un accident.",75,{p:{sub:2},req:["accent-1"]}),
+ C("hybride",5,"mediator","mediator","Hybride : médiator et doigts",
+   "Médiator sur la basse, majeur et annulaire sur les deux cordes aiguës, simultanément. C'est ici que ton passé classique paie.",
+   "16 mesures, basse et aigus sonnent ensemble et à volume comparable.",65,{req:["pm-base"]}),
+ C("shuffle-mi",5,"piece","mediator","Shuffle en Mi",
+   "Riff en quintes, palm mute, croches swinguées, médiator.",
+   "3 grilles enchaînées à 90 bpm, l'étouffement tient du début à la fin.",90,
+   {p:{sub:2,swing:true,jazz:true},req:["pm-alterne","accent-1","ar-vide"]})
+];
+
+/* ═══════════════════════════════════════════════════════════
+   2 · ÉTAT
+   ═══════════════════════════════════════════════════════════ */
+const aujourdhui = ()=>ymd(new Date());
+function ymd(d){return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0");}
+function plusJours(iso,n){const p=iso.split("-").map(Number);const d=new Date(p[0],p[1]-1,p[2]);d.setDate(d.getDate()+n);return ymd(d);}
+function ecartJours(a,b){const pa=a.split("-").map(Number),pb=b.split("-").map(Number);
+  return Math.round((new Date(pb[0],pb[1]-1,pb[2])-new Date(pa[0],pa[1]-1,pa[2]))/86400000);}
+function uid(){return "u"+Date.now().toString(36)+Math.random().toString(36).slice(2,6);}
+
+function carteNeuve(m){
+  return Object.assign({},m,{statut:"neuf",ef:2.5,interval:0,due:null,reps:0,lapses:0,
+    bpmTravail:m.bpmCible,bpmRecord:0,rappels:0,dernierVu:null});
+}
+function etatNeuf(){
+  return {version:2,dureeSeance:25,
+    metro:{bpm:80,temps:4,sub:1,swing:false,jazz:true,gap:false,gapJouees:2,gapMuettes:2,
+           ramp:false,rampTous:8,rampPas:2,rampMax:140},
+    cartes:CORPUS.map(carteNeuve),journal:[],introJour:{date:null,n:0}};
+}
+
+let S;
+try{ const b=localStorage.getItem(CLE); S=b?JSON.parse(b):etatNeuf(); if(!S||!Array.isArray(S.cartes)) S=etatNeuf(); }
+catch(e){ S=etatNeuf(); }
+
+/* fusion : le corpus fait autorité sur le contenu, la sauvegarde sur la progression */
+(function fusionner(){
+  const connus=new Set(S.cartes.map(c=>c.id));
+  CORPUS.forEach(m=>{
+    if(!connus.has(m.id)){ S.cartes.push(carteNeuve(m)); return; }
+    const c=S.cartes.find(x=>x.id===m.id);
+    c.chapitre=m.chapitre; c.requiert=m.requiert; c.type=m.type; c.main=m.main;
+    c.titre=m.titre; c.consigne=m.consigne; c.critere=m.critere;
+    c.rythme=m.rythme; c.bpmCible=m.bpmCible;
+    c.preset=Object.assign({},m.preset,{bpm:c.bpmTravail||m.preset.bpm});
+    if(c.rappels===undefined) c.rappels=0;
+    if(c.dernierVu===undefined) c.dernierVu=null;
+    if(c.bpmTravail===undefined) c.bpmTravail=m.bpmCible;
+  });
+})();
+
+let differe=null;
+function sauver(){ clearTimeout(differe); differe=setTimeout(()=>{
+  try{ localStorage.setItem(CLE,JSON.stringify(S)); }catch(e){ console.warn("sauvegarde",e); } },250); }
+
+const $=s=>document.querySelector(s), $$=s=>Array.from(document.querySelectorAll(s));
+const parId=id=>S.cartes.find(c=>c.id===id);
+function echapper(s){const d=document.createElement("div");d.textContent=s;return d.innerHTML;}
+
+/* ═══════════════════════════════════════════════════════════
+   3 · MOTEUR AUDIO — une instance, plusieurs afficheurs
+   ═══════════════════════════════════════════════════════════ */
+let ctx=null, veille=null;
+function initAudio(){
+  if(!ctx) ctx=new (window.AudioContext||window.webkitAudioContext)();
+  if(ctx.state==="suspended") ctx.resume();
+  return ctx;
+}
+
+const Moteur = {
+  R:null, cible:null, on:false, timer:null,
+  temps:0, sub:0, prochain:0, mesure:0, file:[],
+  LOOKAHEAD:25, HORIZON:0.12,
+
+  muet(){ const R=this.R; if(!R.gap) return false;
+    const cy=Math.max(1,R.gapJouees)+Math.max(1,R.gapMuettes);
+    return (this.mesure%cy)>=Math.max(1,R.gapJouees); },
+
+  clic(temps,sub,t,muet){
+    if(muet) return;
+    const R=this.R, back=R.jazz&&(temps===1||temps===3);
+    let f=760,v=0.16;
+    if(sub!==0){ f=560; v=0.06; }
+    else if(R.jazz){ if(back){f=1180;v=0.30;} else {f=700;v=0.09;} }
+    else if(temps===0){ f=1500; v=0.34; }
+    else { f=900; v=0.18; }
+    const o=ctx.createOscillator(), g=ctx.createGain();
+    o.type = sub===0?"square":"sine"; o.frequency.value=f;
+    g.gain.setValueAtTime(0.0001,t);
+    g.gain.exponentialRampToValueAtTime(v,t+0.002);
+    g.gain.exponentialRampToValueAtTime(0.0001,t+(sub===0?0.055:0.03));
+    o.connect(g).connect(ctx.destination); o.start(t); o.stop(t+0.08);
+  },
+
+  avancer(){
+    const R=this.R, parTemps=60/R.bpm, n=R.sub;
+    this.prochain += (n===2&&R.swing) ? (this.sub===0?2/3:1/3)*parTemps : parTemps/n;
+    this.sub++;
+    if(this.sub>=n){
+      this.sub=0; this.temps++;
+      if(this.temps>=R.temps){
+        this.temps=0; this.mesure++;
+        if(R.ramp && this.mesure>0 && this.mesure%Math.max(1,R.rampTous)===0){
+          const c=Math.min(R.bpm+Math.max(1,R.rampPas),R.rampMax);
+          if(c!==R.bpm){ R.bpm=c; if(this.cible&&this.cible.surTempo) this.cible.surTempo(c); sauver(); }
+        }
+      }
+    }
+  },
+
+  ordonnancer(){
+    while(this.prochain < ctx.currentTime+this.HORIZON){
+      const m=this.muet();
+      this.clic(this.temps,this.sub,this.prochain,m);
+      this.file.push({temps:this.temps,sub:this.sub,t:this.prochain,muet:m,mesure:this.mesure});
+      this.avancer();
+    }
+  },
+
+  demarrer(R,cible){
+    initAudio();
+    this.R=R; this.cible=cible; this.on=true;
+    this.temps=0; this.sub=0; this.mesure=0; this.file=[];
+    this.prochain=ctx.currentTime+0.06;
+    this.timer=setInterval(()=>this.ordonnancer(),this.LOOKAHEAD);
+    veiller(); this.boucle();
+  },
+  arreter(){
+    const c=this.cible;
+    this.on=false; clearInterval(this.timer); this.timer=null; this.file=[]; this.cible=null;
+    if(c&&c.surArret) c.surArret();
+    libererVeille();
+  },
+  basculer(R,cible){
+    const meme = this.on && this.cible && this.cible.id===cible.id;
+    if(this.on) this.arreter();
+    if(!meme) this.demarrer(R,cible);
+  },
+  boucle(){
+    if(!this.on) return;
+    const t=ctx.currentTime;
+    while(this.file.length && this.file[0].t<=t){
+      const ev=this.file.shift();
+      if(ev.sub===0 && this.cible && this.cible.surTemps) this.cible.surTemps(ev);
+    }
+    requestAnimationFrame(()=>this.boucle());
+  }
+};
+
+async function veiller(){ try{ if("wakeLock" in navigator) veille=await navigator.wakeLock.request("screen"); }catch(e){} }
+function libererVeille(){ try{ veille&&veille.release(); }catch(e){} veille=null; }
+document.addEventListener("visibilitychange",()=>{ if(document.visibilityState==="visible"&&Moteur.on) veiller(); });
+
+/* ── afficheur : cadran de l'onglet Métronome ── */
+const cv=$("#cadran"), cx=cv.getContext("2d");
+let tAff=-1, muetAff=false, flash=0;
+const cibleCadran = {
+  id:"cadran",
+  surTemps(ev){ tAff=ev.temps; muetAff=ev.muet; flash=1;
+    $("#compteur").textContent="mesure "+(ev.mesure+1)+(ev.muet?" · silence":""); },
+  surTempo(b){ $("#bpm").value=b; $("#bpm-lu").textContent=b; },
+  surArret(){ tAff=-1; muetAff=false; $("#jouer").textContent="Démarrer"; }
+};
+function dimensionner(){
+  const r=Math.min(window.devicePixelRatio||1,2), css=cv.getBoundingClientRect().width||280;
+  cv.width=Math.round(css*r); cv.height=Math.round(css*r); cx.setTransform(r,0,0,r,0,0); dessinerCadran();
+}
+window.addEventListener("resize",dimensionner);
+function dessinerCadran(){
+  const R=S.metro, w=cv.width/Math.min(window.devicePixelRatio||1,2), c=w/2, ray=w*0.38;
+  cx.clearRect(0,0,w,w);
+  cx.beginPath(); cx.arc(c,c,ray,0,Math.PI*2); cx.strokeStyle="#DFD1B8"; cx.lineWidth=1.5;
+  cx.setLineDash(muetAff?[4,6]:[]); cx.stroke(); cx.setLineDash([]);
+  for(let i=0;i<R.temps;i++){
+    const a=-Math.PI/2+i*(Math.PI*2/R.temps), x=c+Math.cos(a)*ray, y=c+Math.sin(a)*ray;
+    const accent = R.jazz ? (i===1||i===3) : (i===0), actif=(i===tAff);
+    const r0=(accent?11:7)+(actif?5*flash:0);
+    cx.beginPath(); cx.arc(x,y,r0,0,Math.PI*2);
+    cx.fillStyle = actif ? (muetAff?"#B9A88C":(accent?"#B8892B":"#2B2320")) : (accent?"#DFD1B8":"#EBE0CD");
+    cx.fill();
+    if(accent&&!actif){ cx.strokeStyle="#B8892B"; cx.lineWidth=1.2; cx.stroke(); }
+    cx.fillStyle=actif?"#FBF7EE":"#8B6F47"; cx.font="600 11px 'Work Sans',sans-serif";
+    cx.textAlign="center"; cx.textBaseline="middle";
+    if(r0>=9||actif) cx.fillText(String(i+1),x,y+0.5);
+  }
+  cx.fillStyle=muetAff?"#B9A88C":"#2B2320";
+  cx.font="600 32px 'Cormorant Garamond',Georgia,serif";
+  cx.textAlign="center"; cx.textBaseline="alphabetic";
+  cx.fillText(muetAff?"—":String(tAff+1||"·"),c,c+6);
+  cx.fillStyle="#8B6F47"; cx.font="500 9px 'Work Sans',sans-serif";
+  cx.fillText(muetAff?"SILENCE":"TEMPS",c,c+23);
+}
+(function animer(){ flash=Math.max(0,flash-0.09); dessinerCadran(); requestAnimationFrame(animer); })();
+
+$("#jouer").addEventListener("click",()=>{
+  Moteur.basculer(S.metro,cibleCadran);
+  $("#jouer").textContent = Moteur.on?"Arrêter":"Démarrer";
+});
+
+/* ── afficheur : métronome embarqué dans un exercice ── */
+let nEmb=0;
+function metronomeEmbarque(carte,hote){
+  const idc="emb"+(++nEmb);
+  const R=Object.assign({},carte.preset,{bpm:carte.bpmTravail||carte.preset.bpm});
+  const el=document.createElement("div");
+  el.className="embarque";
+  el.innerHTML=
+    '<div class="haut">'+
+      '<button class="lecture" data-on="0" aria-label="Démarrer le métronome de cet exercice">&#9654;</button>'+
+      '<div class="tempo"><span class="v"></span><i> bpm</i></div>'+
+      '<div class="pm"><button data-d="-4">&minus;</button><button data-d="4">+</button></div>'+
+    '</div><div class="temps-ligne"></div><div class="reglages"></div>';
+  hote.appendChild(el);
+
+  const ligne=el.querySelector(".temps-ligne"), val=el.querySelector(".v"), lect=el.querySelector(".lecture");
+  val.textContent=R.bpm;
+
+  (function construireLigne(){
+    ligne.innerHTML="";
+    for(let i=0;i<R.temps;i++){
+      const b=document.createElement("i");
+      if(R.jazz ? (i===1||i===3) : i===0) b.classList.add("accent");
+      ligne.appendChild(b);
+    }
+  })();
+
+  function decrire(){
+    const p=["<b>"+R.temps+"/4</b>", ["noires","croches","triolets","doubles"][R.sub-1]];
+    if(R.swing) p.push("<b>swing</b>");
+    if(R.jazz)  p.push("<b>accent 2 et 4</b>");
+    if(R.gap)   p.push("<b>trous "+R.gapJouees+" jouées / "+R.gapMuettes+" muettes</b>");
+    if(R.ramp)  p.push("<b>progressif</b> +"+R.rampPas+" toutes les "+R.rampTous+" mes., plafond "+R.rampMax);
+    el.querySelector(".reglages").innerHTML="Préréglé pour cet exercice : "+p.join(" · ")+
+      ". Cible "+carte.bpmCible+" bpm"+(carte.bpmRecord?" · record "+carte.bpmRecord:"")+".";
+  }
+  decrire();
+
+  const cible={
+    id:idc,
+    surTemps(ev){
+      Array.from(ligne.children).forEach((b,i)=>{
+        b.classList.toggle("on", i===ev.temps && !ev.muet);
+        b.classList.toggle("muet", ev.muet);
+      });
+    },
+    surTempo(b){ R.bpm=b; val.textContent=b; carte.bpmTravail=b; },
+    surArret(){ Array.from(ligne.children).forEach(b=>b.classList.remove("on","muet"));
+      lect.dataset.on="0"; lect.innerHTML="&#9654;"; }
+  };
+
+  lect.addEventListener("click",()=>{
+    Moteur.basculer(R,cible);
+    const on = Moteur.on && Moteur.cible && Moteur.cible.id===idc;
+    lect.dataset.on=on?"1":"0"; lect.innerHTML=on?"&#9632;":"&#9654;";
+    $("#jouer").textContent="Démarrer";
+  });
+  el.querySelectorAll(".pm button").forEach(b=>b.addEventListener("click",()=>{
+    R.bpm=Math.max(30,Math.min(240,R.bpm+(+b.dataset.d)));
+    val.textContent=R.bpm; carte.bpmTravail=R.bpm; decrire(); sauver();
+  }));
+  return el;
+}
+
+/* ── réglages de l'onglet Métronome ── */
+const M=S.metro;
+function majBpm(){ $("#bpm").value=M.bpm; $("#bpm-lu").textContent=M.bpm; }
+function poserBpm(v){ M.bpm=Math.max(30,Math.min(240,Math.round(v))); majBpm(); sauver(); }
+$("#bpm").addEventListener("input",e=>poserBpm(+e.target.value));
+$$("[data-bpm]").forEach(b=>b.addEventListener("click",()=>poserBpm(M.bpm+(+b.dataset.bpm))));
+let taps=[];
+$("#tap").addEventListener("click",()=>{
+  const t=performance.now();
+  if(taps.length&&t-taps[taps.length-1]>2200) taps=[];
+  taps.push(t); if(taps.length>5) taps.shift();
+  if(taps.length>=2){ let s=0; for(let i=1;i<taps.length;i++) s+=taps[i]-taps[i-1];
+    poserBpm(60000/(s/(taps.length-1))); }
+});
+function construirePuces(hote,vals,lu,poser,apres){
+  hote.innerHTML="";
+  vals.forEach(v=>{
+    const b=document.createElement("button");
+    b.className="puce"; b.textContent=v.l; b.setAttribute("aria-pressed",String(lu()===v.v));
+    b.addEventListener("click",()=>{
+      poser(v.v); sauver();
+      Array.from(hote.children).forEach(c=>c.setAttribute("aria-pressed","false"));
+      b.setAttribute("aria-pressed","true");
+      if(apres) apres();
+    });
+    hote.appendChild(b);
+  });
+}
+function relance(){
+  if(Moteur.on&&Moteur.cible&&Moteur.cible.id==="cadran"){
+    Moteur.arreter(); Moteur.demarrer(S.metro,cibleCadran); $("#jouer").textContent="Arrêter";
+  }
+  dessinerCadran();
+}
+construirePuces($("#choix-temps"),[{l:"4/4",v:4},{l:"3/4",v:3},{l:"6/8",v:6},{l:"5/4",v:5},{l:"2/4",v:2}],()=>M.temps,v=>M.temps=v,relance);
+construirePuces($("#choix-sub"),[{l:"noires",v:1},{l:"croches",v:2},{l:"triolets",v:3},{l:"doubles",v:4}],()=>M.sub,v=>M.sub=v,relance);
+function lier(id,champ,apres){
+  const el=$(id), chk=el.type==="checkbox";
+  el[chk?"checked":"value"]=M[champ];
+  el.addEventListener("change",()=>{ M[champ]=chk?el.checked:(+el.value||0); sauver(); if(apres)apres(); relance(); });
+}
+lier("#swing","swing"); lier("#jazz","jazz");
+lier("#gap","gap",()=>$("#gap-reglages").style.display=M.gap?"block":"none");
+lier("#gap-jouees","gapJouees"); lier("#gap-muettes","gapMuettes");
+lier("#ramp","ramp",()=>$("#ramp-reglages").style.display=M.ramp?"block":"none");
+lier("#ramp-tous","rampTous"); lier("#ramp-pas","rampPas"); lier("#ramp-max","rampMax");
+$("#gap-reglages").style.display=M.gap?"block":"none";
+$("#ramp-reglages").style.display=M.ramp?"block":"none";
+majBpm();
+
+/* ═══════════════════════════════════════════════════════════
+   4 · RÉVISION ESPACÉE ET RÉCURSIVITÉ
+   ═══════════════════════════════════════════════════════════ */
+function dues(){ const h=aujourdhui();
+  return S.cartes.filter(c=>c.statut==="apprise"&&c.due&&ecartJours(c.due,h)>=0); }
+function neuves(){ return S.cartes.filter(c=>c.statut==="neuf"); }
+function apprises(){ return S.cartes.filter(c=>c.statut==="apprise"); }
+function debloquee(c){ return c.requiert.every(id=>{ const p=parId(id); return !p||p.statut==="apprise"; }); }
+
+function repartition(total){
+  const b=BLOCS.map(x=>({id:x.id,nom:x.nom,part:x.part,detail:x.detail,min:Math.max(1,Math.round(total*x.part))}));
+  let s=b.reduce((a,x)=>a+x.min,0),g=0;
+  while(s!==total&&g++<60){
+    const i=s>total?b.indexOf(b.reduce((a,c)=>c.min>a.min?c:a)):b.indexOf(b.reduce((a,c)=>c.min<a.min?c:a));
+    b[i].min+=s>total?-1:1; if(b[i].min<1)b[i].min=1; s=b.reduce((a,x)=>a+x.min,0);
+  }
+  return b;
+}
+function capaciteFile(){ return Math.floor(repartition(S.dureeSeance).find(b=>b.id==="cartes").min*60/45); }
+function quotaNouveautes(){ return Math.max(1,Math.min(5,Math.floor(capaciteFile()/2))); }
+function quotaRestant(){
+  const h=aujourdhui();
+  if(S.introJour.date!==h){ S.introJour={date:h,n:0}; sauver(); }
+  return Math.max(0,quotaNouveautes()-S.introJour.n);
+}
+
+/* entrelacement : deux cartes voisines ne partagent pas leur type */
+function entrelacer(liste){
+  const par={}; liste.forEach(c=>{ (par[c.type]=par[c.type]||[]).push(c); });
+  const paquets=Object.values(par).sort((a,b)=>b.length-a.length);
+  const out=[]; let dernier=null;
+  while(paquets.some(p=>p.length)){
+    const choisi = paquets.find(p=>p.length&&p[0].type!==dernier) || paquets.find(p=>p.length);
+    const c=choisi.shift(); out.push(c); dernier=c.type;
+  }
+  return out;
+}
+
+/* brassage : repêche l'acquis le plus anciennement revu */
+function brassage(n,exclus){
+  if(n<=0) return [];
+  const h=aujourdhui();
+  return apprises()
+    .filter(c=>!exclus.has(c.id))
+    .filter(c=>!c.due||ecartJours(c.due,h)<0)
+    .sort((a,b)=>{
+      const va=a.dernierVu?ecartJours(a.dernierVu,h):9999;
+      const vb=b.dernierVu?ecartJours(b.dernierVu,h):9999;
+      return vb-va;
+    })
+    .slice(0,n)
+    .map(c=>{ c._brasse=true; return c; });
+}
+
+function fileDuJour(){
+  const cap=capaciteFile();
+  const d=dues();
+  const place=Math.max(0,cap-d.length);
+  const n=neuves().filter(debloquee).sort((a,b)=>a.chapitre-b.chapitre)
+          .slice(0,Math.min(quotaRestant(),place));
+  let f=entrelacer(d.concat(n));
+  const exclus=new Set(f.map(c=>c.id));
+  const reste=cap-f.length;
+  if(reste>0) f=f.concat(brassage(Math.min(2,reste),exclus));
+  return f;
+}
+
+function noter(carte,q){
+  if(carte.statut==="neuf"){ carte.statut="apprise"; S.introJour.n++; }
+  if(q===0){
+    carte.lapses++; carte.reps=0; carte.ef=Math.max(1.3,carte.ef-0.20); carte.interval=0;
+  }else{
+    if(q===1){ carte.ef=Math.max(1.3,carte.ef-0.15);
+      carte.interval = carte.reps===0?1:Math.max(1,Math.round(carte.interval*1.2)); }
+    else if(q===2){ carte.interval = carte.reps===0?1:(carte.reps===1?3:Math.round(carte.interval*carte.ef)); }
+    else{ carte.ef=Math.min(2.8,carte.ef+0.15);
+      carte.interval = carte.reps===0?2:(carte.reps===1?5:Math.round(carte.interval*carte.ef*1.3)); }
+    carte.reps++;
+  }
+  carte.interval=Math.min(carte.interval,PLAFOND_INTERVALLE);
+  carte.due=plusJours(aujourdhui(),carte.interval);
+  carte.dernierVu=aujourdhui();
+  const credites = q>=2 ? crediterPrerequis(carte) : [];
+  sauver();
+  return credites;
+}
+
+/* rappel contextuel : le prérequis rejoué dans un exercice avancé recule */
+function crediterPrerequis(carte){
+  const h=aujourdhui(), out=[];
+  carte.requiert.forEach(id=>{
+    const p=parId(id);
+    if(!p||p.statut!=="apprise") return;
+    const avant=p.interval;
+    p.interval=Math.min(PLAFOND_INTERVALLE,Math.max(1,Math.round(p.interval*CREDIT_RAPPEL)));
+    p.due=plusJours(h,p.interval); p.dernierVu=h; p.rappels=(p.rappels||0)+1;
+    out.push({titre:p.titre,avant,apres:p.interval});
+  });
+  return out;
+}
+
+function apercu(carte,q){
+  let i;
+  const premiere = carte.statut==="neuf" || carte.reps===0;
+  if(q===0) i=0;
+  else if(q===1) i = premiere?1:Math.max(1,Math.round(carte.interval*1.2));
+  else if(q===2) i = premiere?1:(carte.reps===1?3:Math.round(carte.interval*carte.ef));
+  else i = premiere?2:(carte.reps===1?5:Math.round(carte.interval*carte.ef*1.3));
+  i=Math.min(i,PLAFOND_INTERVALLE);
+  return i===0?"aujourd'hui":i===1?"demain":"dans "+i+" j";
+}
+
+/* ── session de révision ── */
+let file=[], enCours=null;
+function ouvrirRevision(){
+  file=fileDuJour();
+  if(!file.length){ rendreCartes(); return; }
+  $("#zone-liste").style.display="none"; $("#zone-revision").style.display="block";
+  carteSuivante();
+}
+function carteSuivante(){
+  if(!file.length){ finRevision(); return; }
+  if(Moteur.on) Moteur.arreter();
+  enCours=file.shift();
+  const c=enCours, ch=CHAPITRES[c.chapitre];
+  $("#rev-type").textContent="ch."+c.chapitre+" · "+c.type+
+    (c.statut==="neuf"?" · nouvelle":"")+(c._brasse?" · brassage":"");
+  $("#rev-reste").textContent=(file.length+1)+" restante"+(file.length?"s":"");
+  $("#rev-consigne").textContent=c.consigne;
+  $("#rev-rythme").textContent=c.rythme||"";
+  $("#rev-rythme").style.display=c.rythme?"block":"none";
+  $("#rev-metro").innerHTML=""; metronomeEmbarque(c,$("#rev-metro"));
+  $("#rev-chapitre").textContent = ch?ch.titre:"";
+  $("#rev-critere").textContent=c.critere;
+  $("#rev-critere").style.display="none";
+  $("#rev-rappel").innerHTML="";
+  $("#rev-avant").style.display="block"; $("#rev-apres").style.display="none";
+}
+$("#voir-critere").addEventListener("click",()=>{
+  $("#rev-critere").style.display="block";
+  $("#rev-avant").style.display="none"; $("#rev-apres").style.display="block";
+  [0,1,2,3].forEach(q=>{ $("#i"+q).textContent=apercu(enCours,q); });
+});
+$$(".notes button").forEach(b=>b.addEventListener("click",()=>{
+  const q=+b.dataset.q, c=enCours;
+  if(c.bpmTravail>c.bpmRecord) c.bpmRecord=c.bpmTravail;
+  delete c._brasse;
+  const credits=noter(c,q);
+  if(q===0) file.push(c);
+  if(credits.length){
+    const d=document.createElement("div"); d.className="rappel";
+    d.innerHTML="<b>Rappel contextuel.</b> "+credits.map(x=>
+      echapper(x.titre)+" recule de "+x.avant+" à "+x.apres+" j").join(" · ")+
+      " — ces items viennent d'être rejoués à l'intérieur de cet exercice.";
+    $("#rev-rappel").innerHTML=""; $("#rev-rappel").appendChild(d);
+    setTimeout(carteSuivante,1600);
+  }else carteSuivante();
+}));
+function finRevision(){
+  if(Moteur.on) Moteur.arreter();
+  $("#zone-revision").style.display="none"; $("#zone-liste").style.display="block";
+  rendreCartes();
+}
+$("#reviser").addEventListener("click",ouvrirRevision);
+
+/* ═══════════════════════════════════════════════════════════
+   5 · VUES
+   ═══════════════════════════════════════════════════════════ */
+$$("nav button").forEach(b=>b.addEventListener("click",()=>{
+  $$("nav button").forEach(x=>x.removeAttribute("aria-current"));
+  b.setAttribute("aria-current","page");
+  $$(".vue").forEach(v=>v.classList.remove("actif"));
+  $("#vue-"+b.dataset.vue).classList.add("actif");
+  window.scrollTo({top:0});
+  if(b.dataset.vue==="journal") rendreJournal();
+  if(b.dataset.vue==="cartes") rendreCartes();
+  if(b.dataset.vue==="chapitres") rendreChapitres();
+  if(b.dataset.vue==="metro") dimensionner();
+}));
+
+function ouvrirTiroir(titre,html){
+  $("#tiroir-titre").textContent=titre; $("#tiroir-corps").innerHTML=html;
+  $("#tiroir").classList.add("ouvert"); $("#voile").classList.add("ouvert");
+}
+function fermerTiroir(){
+  if(Moteur.on && Moteur.cible && String(Moteur.cible.id).indexOf("emb")===0) Moteur.arreter();
+  $("#tiroir").classList.remove("ouvert"); $("#voile").classList.remove("ouvert");
+}
+document.addEventListener("click",e=>{
+  const t=e.target.closest(".terme");
+  if(t&&GLOSSAIRE[t.dataset.terme]) ouvrirTiroir(GLOSSAIRE[t.dataset.terme].t,"<p>"+GLOSSAIRE[t.dataset.terme].c+"</p>");
+});
+$("#voile").addEventListener("click",fermerTiroir);
+$("#fermer-tiroir").addEventListener("click",fermerTiroir);
+document.addEventListener("keydown",e=>{ if(e.key==="Escape") fermerTiroir(); });
+
+/* ── chapitres ── */
+function rendreChapitres(){
+  const hote=$("#liste-chapitres"); hote.innerHTML="";
+  CHAPITRES.forEach(ch=>{
+    const cartes=S.cartes.filter(c=>c.chapitre===ch.id);
+    const acq=cartes.filter(c=>c.statut==="apprise").length;
+    const d=document.createElement("div");
+    d.className="carte"+(ch.avenir?" verrou":"");
+    const grille = ch.piece.grille.length
+      ? '<div class="grille">'+ch.piece.grille.map(a=>"<span>"+echapper(a)+"</span>").join("")+"</div>"
+      : '<p><small>Grille à prendre dans ton recueil.</small></p>';
+    d.innerHTML=
+      '<div class="rang"><span class="etiquette">Chapitre '+ch.id+' · palier '+ch.palier+'</span>'+
+      '<span class="badge type">'+(ch.avenir?"à venir":acq+"/"+cartes.length)+'</span></div>'+
+      '<h3 style="margin-top:4px">'+echapper(ch.titre)+'</h3>'+
+      '<p><small>'+echapper(ch.focus)+'</small></p>'+
+      '<div class="piece"><span class="etiquette">Pièce du chapitre · '+echapper(ch.piece.mesure)+'</span>'+
+      '<h3 style="font-size:1rem;margin-top:3px">'+echapper(ch.piece.titre)+'</h3>'+grille+
+      '<p style="font-size:.84rem"><b>Pourquoi celle-ci.</b> '+echapper(ch.piece.pourquoi)+'</p></div>';
+    if(cartes.length){
+      const liste=document.createElement("div"); liste.style.marginTop="8px";
+      cartes.forEach(c=>liste.appendChild(ligneCarte(c)));
+      d.appendChild(liste);
+    }
+    hote.appendChild(d);
+  });
+}
+
+/* ── ligne de carte réutilisable ── */
+function ligneCarte(c){
+  const h=aujourdhui();
+  let etat,cls;
+  if(c.statut==="neuf"){ const ok=debloquee(c); etat=ok?"neuve":"verrouillée"; cls=ok?"neuf":"plus-tard"; }
+  else if(ecartJours(c.due,h)>=0){ etat="due"; cls="du"; }
+  else if(c.interval>=SEUIL_ENTRETIEN){ etat="entretien"; cls="entretien"; }
+  else { const j=ecartJours(h,c.due); etat=j===1?"demain":"dans "+j+" j"; cls="plus-tard"; }
+  const d=document.createElement("div"); d.className="item";
+  d.innerHTML='<div class="t"><b></b><small></small></div>'+
+    (c.main==="mediator"?'<span class="badge med">méd.</span>':'')+
+    '<span class="badge '+cls+'">'+etat+'</span>';
+  d.querySelector("b").textContent=c.titre;
+  d.querySelector("small").textContent=
+    c.type+" · cible "+c.bpmCible+" bpm"+(c.bpmRecord?" · record "+c.bpmRecord:"")+
+    (c.rappels?" · "+c.rappels+" rappel"+(c.rappels>1?"s":""):"");
+  d.addEventListener("click",()=>ouvrirCarte(c));
+  return d;
+}
+
+function ouvrirCarte(c){
+  const req=c.requiert.map(id=>{const p=parId(id);return p?p.titre:id;});
+  const suites=S.cartes.filter(x=>x.requiert.indexOf(c.id)>=0).map(x=>x.titre);
+  ouvrirTiroir(c.titre,
+    '<p><b>Consigne.</b> '+echapper(c.consigne)+'</p>'+
+    (c.rythme?'<p class="rythme">'+echapper(c.rythme)+'</p>':'')+
+    '<div id="tiroir-metro"></div>'+
+    '<p><b>Critère.</b> '+echapper(c.critere)+'</p>'+
+    (req.length?'<p><small><b>Suppose acquis :</b> '+req.map(echapper).join(" · ")+'</small></p>':'')+
+    (suites.length?'<p><small><b>Sera rappelé par :</b> '+suites.map(echapper).join(" · ")+'</small></p>':'')+
+    '<p><small>Chapitre '+c.chapitre+' · facilité '+c.ef.toFixed(2)+' · intervalle '+c.interval+' j · '+
+    c.reps+' révisions · '+c.lapses+' échecs · '+(c.rappels||0)+' rappels contextuels</small></p>');
+  metronomeEmbarque(c,$("#tiroir-metro"));
+}
+
+/* ── liste des cartes ── */
+let filtre="tout";
+construirePuces($("#filtres"),
+  [{l:"tout",v:"tout"},{l:"file du jour",v:"file"},{l:"médiator",v:"mediator"},{l:"transitions",v:"transition"},
+   {l:"rythmes",v:"rythme"},{l:"pièces",v:"piece"},{l:"entretien",v:"entretien"}],
+  ()=>filtre,v=>{filtre=v;},()=>rendreCartes());
+
+function rendreCartes(){
+  const f=fileDuJour();
+  $("#compte-dues").textContent=f.length;
+  const nD=dues().length, nN=f.filter(c=>c.statut==="neuf").length, nB=f.filter(c=>c._brasse).length;
+  $("#detail-file").textContent=
+    nD+" due"+(nD>1?"s":"")+" · "+nN+" nouveauté"+(nN>1?"s":"")+" (quota "+quotaNouveautes()+"/j) · "+
+    nB+" en brassage · capacité "+capaciteFile()+" cartes · "+neuves().length+" en réserve";
+  const p=$("#pastille");
+  if(f.length){ p.hidden=false; p.textContent=f.length; } else p.hidden=true;
+  $("#reviser").disabled=!f.length;
+
+  let lot=S.cartes.slice();
+  if(filtre==="file") lot=f;
+  else if(filtre==="mediator") lot=lot.filter(c=>c.main==="mediator");
+  else if(filtre==="entretien") lot=lot.filter(c=>c.statut==="apprise"&&c.interval>=SEUIL_ENTRETIEN);
+  else if(filtre!=="tout") lot=lot.filter(c=>c.type===filtre);
+  lot.sort((a,b)=>(a.chapitre-b.chapitre)||a.titre.localeCompare(b.titre,"fr"));
+
+  const hote=$("#liste-cartes");
+  if(!lot.length){ hote.innerHTML='<div class="vide">Aucune carte dans ce filtre.</div>'; return; }
+  hote.innerHTML=""; lot.forEach(c=>hote.appendChild(ligneCarte(c)));
+}
+
+$("#ajouter-carte").addEventListener("click",()=>{
+  const t=$("#n-titre").value.trim(); if(!t){ $("#n-titre").focus(); return; }
+  const m=C(uid(),0,$("#n-type").value,"indifferent",t,
+    $("#n-consigne").value.trim()||t, $("#n-critere").value.trim()||"À définir.",
+    +$("#n-bpm").value||80, {r:$("#n-rythme").value.trim()});
+  S.cartes.push(carteNeuve(m));
+  ["#n-titre","#n-consigne","#n-critere","#n-rythme"].forEach(i=>$(i).value="");
+  sauver(); rendreCartes();
+});
+
+/* ═══════════════════════════════════════════════════════════
+   6 · SÉANCE
+   ═══════════════════════════════════════════════════════════ */
+function BLOCS_DEF(){ return [
+ {id:"echauffement",nom:"Échauffement",part:.12,
+  detail:"Métronome sur 2 et 4, main droite en pendule, un seul accord. On n'apprend rien : on installe le geste."},
+ {id:"drill",nom:"Drill technique",part:.20,
+  detail:"Un point isolé, au tempo où c'est propre — pas au tempo où c'est flatteur. Le travail du médiator se fait ici."},
+ {id:"neuf",nom:"Nouveauté",part:.20,
+  detail:"L'élément du jour, lentement, en comprenant avant de répéter. Une carte verrouillée ne sort que si ses prérequis sont acquis."},
+ {id:"grille",nom:"Application",part:.28,
+  detail:"La pièce du chapitre en cours, en boucle. Jouer sans s'arrêter, même en cas d'erreur : c'est ici que se fabrique la fluidité."},
+ {id:"cartes",nom:"Cartes dues",part:.20,
+  detail:"File entrelacée : les types alternent au lieu d'être groupés, et un ou deux items anciens sont repêchés."}
+];}
+const BLOCS = BLOCS_DEF();
+
+construirePuces($("#raccourcis-duree"),
+  [{l:"12",v:12},{l:"20",v:20},{l:"25",v:25},{l:"40",v:40},{l:"60",v:60}],
+  ()=>S.dureeSeance,v=>{S.dureeSeance=v;},()=>{sauver();rendreSeance();});
+
+function chapitreActif(){
+  const ouverts=CHAPITRES.filter(ch=>!ch.avenir);
+  for(let i=0;i<ouverts.length;i++){
+    const cs=S.cartes.filter(c=>c.chapitre===ouverts[i].id);
+    if(cs.some(c=>c.statut==="neuf")) return ouverts[i];
+  }
+  return ouverts[ouverts.length-1];
+}
+function rendreSeance(){
+  const t=S.dureeSeance;
+  $("#duree").value=t; $("#duree-lue").innerHTML=t+'<sup> min</sup>';
+  $$("#raccourcis-duree .puce").forEach(b=>b.setAttribute("aria-pressed",String(+b.textContent===t)));
+  const b=repartition(t), ch=chapitreActif();
+  $("#plan").innerHTML=b.map(x=>{
+    let d=x.detail;
+    if(x.id==="grille") d+=" Actuellement : « "+ch.piece.titre+" ».";
+    return '<div class="bloc-seance"><div class="duree">'+x.min+'<i> min</i></div>'+
+      '<div class="corps"><b>'+x.nom+'</b><small>'+echapper(d)+'</small></div></div>';
+  }).join("");
+  const q=quotaNouveautes(), res=neuves().length, dispo=neuves().filter(debloquee).length;
+  const jours=q>0?Math.ceil(res/q):0;
+  $("#suggestion").innerHTML=
+    "À "+t+" min, le bloc de révision tient <b>"+capaciteFile()+" cartes</b> : le moteur introduit "+
+    "<b>"+q+" nouveauté"+(q>1?"s":"")+" par jour</b> au maximum, pour que la dette de "+
+    '<button class="terme" data-terme="srs">révision espacée</button> reste remboursable.<br><br>'+
+    "Chapitre en cours : <b>"+echapper(ch.titre)+"</b>. Réserve : <b>"+res+"</b> carte"+(res>1?"s":"")+
+    ", dont <b>"+dispo+"</b> débloquée"+(dispo>1?"s":"")+
+    (jours?", soit environ <b>"+jours+" jour"+(jours>1?"s":"")+"</b> au rythme actuel.":".")+
+    '<br><br><button class="terme" data-terme="recursivite">Comment l\'acquis ne disparaît pas</button><br>'+
+    '<button class="terme" data-terme="mediator">Venir de la guitare classique</button><br>'+
+    '<button class="terme" data-terme="inside">Inside et outside picking</button>';
+}
+$("#duree").addEventListener("input",e=>{ S.dureeSeance=+e.target.value; sauver(); rendreSeance(); });
+
+let plan=[],iBloc=0,reste=0,tick=null,pause=false,debut=null;
+function lancerSeance(){
+  plan=repartition(S.dureeSeance); iBloc=0; pause=false; debut=Date.now();
+  $("#deroule").style.display="block"; $("#lancer-seance").disabled=true;
+  demarrerBloc(); $("#deroule").scrollIntoView({behavior:"smooth",block:"start"});
+}
+function demarrerBloc(){
+  if(iBloc>=plan.length){ terminerSeance(); return; }
+  const b=plan[iBloc]; reste=b.min*60;
+  $("#bloc-nom").textContent=(iBloc+1)+" / "+plan.length+" · "+b.nom;
+  $("#bloc-detail").textContent=b.detail;
+  $$("#plan .bloc-seance").forEach((el,i)=>{ el.classList.toggle("encours",i===iBloc); el.classList.toggle("fait",i<iBloc); });
+  $("#chrono").classList.remove("fini"); majChrono();
+  clearInterval(tick);
+  tick=setInterval(()=>{
+    if(pause) return;
+    reste--;
+    if(reste<=0){ clearInterval(tick); $("#chrono").classList.add("fini"); sonnerie(); }
+    majChrono();
+  },1000);
+}
+function majChrono(){
+  const s=Math.max(0,reste);
+  $("#chrono").textContent=String(Math.floor(s/60)).padStart(2,"0")+":"+String(s%60).padStart(2,"0");
+  const tot=plan[iBloc]?plan[iBloc].min*60:1;
+  $("#barre-bloc").style.width=(100*(1-s/tot))+"%";
+}
+function sonnerie(){
+  initAudio();
+  [0,.16,.32].forEach((d,i)=>{
+    const o=ctx.createOscillator(),g=ctx.createGain(),t=ctx.currentTime+d;
+    o.frequency.value=660+i*220; o.type="sine";
+    g.gain.setValueAtTime(0.0001,t); g.gain.exponentialRampToValueAtTime(.22,t+.01);
+    g.gain.exponentialRampToValueAtTime(0.0001,t+.28);
+    o.connect(g).connect(ctx.destination); o.start(t); o.stop(t+.3);
+  });
+  if(navigator.vibrate) navigator.vibrate([120,60,120]);
+}
+$("#pause-bloc").addEventListener("click",()=>{ pause=!pause; $("#pause-bloc").textContent=pause?"Reprendre":"Pause"; });
+$("#suivant-bloc").addEventListener("click",()=>{ iBloc++; demarrerBloc(); });
+$("#stop-seance").addEventListener("click",terminerSeance);
+$("#lancer-seance").addEventListener("click",lancerSeance);
+$("#reinit-seance").addEventListener("click",()=>{ S.dureeSeance=25; sauver(); rendreSeance(); });
+function terminerSeance(){
+  clearInterval(tick);
+  const min=debut?Math.round((Date.now()-debut)/60000):0;
+  if(min>=1){
+    const h=aujourdhui(), d=S.journal[0];
+    if(d&&d.date===h) d.minutes+=min; else S.journal.unshift({date:h,minutes:min,blocs:iBloc});
+    if(S.journal.length>400) S.journal.length=400;
+    sauver();
+  }
+  $("#deroule").style.display="none"; $("#lancer-seance").disabled=false;
+  $$("#plan .bloc-seance").forEach(el=>el.classList.remove("encours","fait"));
+  debut=null; rendreSeance();
+}
+
+/* ═══════════════════════════════════════════════════════════
+   7 · JOURNAL
+   ═══════════════════════════════════════════════════════════ */
+function rendreJournal(){
+  const j=S.journal;
+  $("#stat-total").textContent=j.length;
+  $("#stat-min").textContent=j.reduce((s,x)=>s+x.minutes,0);
+  let serie=0,cur=aujourdhui();
+  const parDate=new Map(j.map(x=>[x.date,x]));
+  if(!parDate.has(cur)) cur=plusJours(cur,-1);
+  while(parDate.has(cur)){ serie++; cur=plusJours(cur,-1); }
+  $("#stat-serie").textContent=serie;
+
+  const ap=apprises();
+  const ent=ap.filter(c=>c.interval>=SEUIL_ENTRETIEN).length;
+  const plaf=ap.filter(c=>c.interval>=PLAFOND_INTERVALLE).length;
+  const rap=S.cartes.reduce((s,c)=>s+(c.rappels||0),0);
+  $("#stat-entretien").innerHTML=
+    "<b>"+ap.length+"</b> cartes apprises, dont <b>"+ent+"</b> en régime d'entretien et <b>"+plaf+
+    "</b> au plafond de "+PLAFOND_INTERVALLE+" jours — aucune ne quitte la rotation. "+
+    "<b>"+rap+"</b> rappels contextuels accumulés : autant de révisions obtenues sans drill séparé.";
+
+  const c=$("#spark"),g=c.getContext("2d");
+  const r=Math.min(window.devicePixelRatio||1,2),L=c.getBoundingClientRect().width||600,H=56;
+  c.width=L*r; c.height=H*r; g.setTransform(r,0,0,r,0,0); g.clearRect(0,0,L,H);
+  const jours=[]; const d0=aujourdhui();
+  for(let i=29;i>=0;i--) jours.push(plusJours(d0,-i));
+  const vals=jours.map(x=>parDate.has(x)?parDate.get(x).minutes:0);
+  const max=Math.max(10,Math.max.apply(null,vals)), lb=L/30;
+  vals.forEach((v,i)=>{ const h=v/max*(H-8);
+    g.fillStyle=v>0?"#B8892B":"#EBE0CD"; g.fillRect(i*lb+1,H-Math.max(h,2),lb-2,Math.max(h,2)); });
+
+  const hote=$("#liste-journal");
+  if(!j.length){ hote.innerHTML='<div class="vide">Aucune séance enregistrée.</div>'; return; }
+  hote.innerHTML=j.slice(0,40).map(x=>
+    '<div class="item"><div class="t"><b>'+x.date+'</b><small>'+x.blocs+' bloc'+(x.blocs>1?'s':'')+'</small></div>'+
+    '<span class="badge type">'+x.minutes+' min</span></div>').join("");
+}
+$("#exporter").addEventListener("click",()=>{
+  const b=new Blob([JSON.stringify(S,null,2)],{type:"application/json"}),a=document.createElement("a");
+  a.href=URL.createObjectURL(b); a.download="comping-"+aujourdhui()+".json"; a.click();
+  setTimeout(()=>URL.revokeObjectURL(a.href),1000);
+});
+$("#importer").addEventListener("click",()=>$("#fichier-import").click());
+$("#fichier-import").addEventListener("change",e=>{
+  const f=e.target.files[0]; if(!f) return;
+  const r=new FileReader();
+  r.onload=()=>{ try{ const o=JSON.parse(r.result); if(!o.cartes) throw new Error("format inattendu");
+    S=o; sauver(); location.reload(); }catch(err){ alert("Fichier illisible : "+err.message); } };
+  r.readAsText(f);
+});
+$("#tout-effacer").addEventListener("click",()=>{
+  if(confirm("Effacer progression, cartes et journal ? Irréversible.")){ localStorage.removeItem(CLE); location.reload(); }
+});
+
+/* ═══════════════════════════════════════════════════════════
+   8 · DÉMARRAGE
+   ═══════════════════════════════════════════════════════════ */
+(function(){
+  const ch=chapitreActif();
+  $("#entete-jour").innerHTML=
+    new Date().toLocaleDateString("fr-BE",{weekday:"long",day:"numeric",month:"long"})+
+    "<br>ch."+ch.id+" · "+echapper(ch.titre);
+  quotaRestant();
+  rendreSeance(); rendreCartes(); rendreChapitres(); dimensionner();
+})();
+</script>
+</body>
+</html>
