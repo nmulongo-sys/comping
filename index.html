@@ -125,6 +125,10 @@ input[type=range]{width:100%;accent-color:var(--or);height:32px}
 .chrono.fini{color:var(--brique)}
 .barre{height:4px;background:var(--creme3);border-radius:2px;overflow:hidden;margin:9px 0}
 .barre i{display:block;height:100%;background:var(--or);width:0;transition:width .4s linear}
+.jalons{display:flex;gap:4px;margin:9px 0 2px}
+.jalons i{flex:1;height:5px;border-radius:3px;background:var(--creme3)}
+.jalons i.fait{background:var(--sepia)}
+.jalons i.encours{background:var(--or)}
 
 .item{border-bottom:1px solid var(--creme3);padding:9px 0;display:flex;gap:9px;align-items:flex-start;cursor:pointer}
 .item:last-child{border-bottom:0}
@@ -207,11 +211,13 @@ input[type=range]{width:100%;accent-color:var(--or);height:32px}
 
   <div id="deroule" style="display:none">
     <hr>
-    <span class="etiquette" id="bloc-nom"></span>
+    <div class="rang"><span class="etiquette" id="bloc-nom"></span><small id="seance-reste"></small></div>
     <div class="chrono" id="chrono">00:00</div>
     <div class="barre"><i id="barre-bloc"></i></div>
-    <p id="bloc-detail" style="min-height:3em"></p>
-    <div class="ligne-b">
+    <div class="jalons" id="jalons"></div>
+    <p id="bloc-detail"></p>
+    <div id="seance-contenu"></div>
+    <div class="ligne-b" style="margin-top:12px">
       <button class="b" id="pause-bloc">Pause</button>
       <button class="b creux" id="suivant-bloc">Bloc suivant</button>
       <button class="b creux petit" id="stop-seance">Arrêter</button>
@@ -281,27 +287,7 @@ input[type=range]{width:100%;accent-color:var(--or);height:32px}
 <section class="vue" id="vue-cartes">
   <h1>Cartes</h1>
 
-  <div id="zone-revision" style="display:none">
-    <div class="carte souligne revision">
-      <div class="rang"><span class="etiquette" id="rev-type"></span><small id="rev-reste"></small></div>
-      <div class="consigne" id="rev-consigne"></div>
-      <div id="rev-rythme" class="rythme"></div>
-      <div id="rev-metro"></div>
-      <small id="rev-chapitre"></small>
-      <div class="critere" id="rev-critere" style="display:none"></div>
-      <div id="rev-rappel"></div>
-      <div id="rev-avant"><button class="b" id="voir-critere" style="margin-top:11px">Voir le critère</button></div>
-      <div id="rev-apres" style="display:none">
-        <div class="notes">
-          <button data-q="0">Encore<i id="i0"></i></button>
-          <button data-q="1">Dur<i id="i1"></i></button>
-          <button data-q="2">Bien<i id="i2"></i></button>
-          <button data-q="3">Facile<i id="i3"></i></button>
-        </div>
-        <small style="display:block;margin-top:7px">Le tempo retenu est celui du métronome ci-dessus.</small>
-      </div>
-    </div>
-  </div>
+  <div id="zone-revision" style="display:none"></div>
 
   <div id="zone-liste">
     <div class="carte">
@@ -1039,7 +1025,68 @@ function apercu(carte,q){
   return i===0?"aujourd'hui":i===1?"demain":"dans "+i+" j";
 }
 
-/* ── session de révision ── */
+/* ── rendu générique d'un exercice : consigne + métronome préréglé + critère + notation ──
+   Utilisé à la fois par l'onglet Cartes et par le déroulé de séance.                        */
+function rendreExercice(c,hote,opts){
+  opts=opts||{};
+  hote.innerHTML="";
+  const ch=CHAPITRES[c.chapitre];
+  const w=document.createElement("div"); w.className="carte souligne revision";
+  w.innerHTML=
+    '<div class="rang"><span class="etiquette e"></span><small class="reste"></small></div>'+
+    '<div class="consigne"></div>'+
+    '<div class="rythme" style="display:none"></div>'+
+    '<div class="gr"></div><div class="metro"></div><small class="chap"></small>'+
+    '<div class="critere" style="display:none"></div><div class="rz"></div>'+
+    '<div class="avant"></div><div class="apres" style="display:none"></div>';
+  hote.appendChild(w);
+  w.querySelector(".e").textContent = opts.etiquette ||
+    ("ch."+c.chapitre+" · "+c.type+(c.statut==="neuf"?" · nouvelle":"")+(c._brasse?" · brassage":""));
+  w.querySelector(".reste").textContent = opts.reste||"";
+  w.querySelector(".consigne").textContent = c.consigne;
+  if(c.rythme){ const r=w.querySelector(".rythme"); r.textContent=c.rythme; r.style.display="block"; }
+  if(opts.grille && opts.grille.length)
+    w.querySelector(".gr").innerHTML='<div class="grille">'+opts.grille.map(a=>"<span>"+echapper(a)+"</span>").join("")+"</div>";
+  metronomeEmbarque(c,w.querySelector(".metro"));
+  w.querySelector(".chap").textContent = opts.sousTitre || (ch?ch.titre:"");
+  const crit=w.querySelector(".critere"); crit.textContent=c.critere;
+  const avant=w.querySelector(".avant"), apres=w.querySelector(".apres");
+  const bv=document.createElement("button");
+  bv.className="b"; bv.style.marginTop="11px"; bv.textContent="Voir le critère";
+  bv.addEventListener("click",()=>{
+    crit.style.display="block"; avant.style.display="none";
+    if(opts.noter) apres.style.display="block";
+  });
+  avant.appendChild(bv);
+  if(opts.noter){
+    const g=document.createElement("div"); g.className="notes";
+    [[0,"Encore"],[1,"Dur"],[2,"Bien"],[3,"Facile"]].forEach(function(x){
+      const b=document.createElement("button"); b.dataset.q=x[0];
+      b.innerHTML=echapper(x[1])+"<i>"+apercu(c,x[0])+"</i>";
+      b.addEventListener("click",()=>{
+        if(c.bpmTravail>c.bpmRecord) c.bpmRecord=c.bpmTravail;
+        delete c._brasse;
+        const cr=noter(c,x[0]);
+        if(cr.length){
+          const d=document.createElement("div"); d.className="rappel";
+          d.innerHTML="<b>Rappel contextuel.</b> "+cr.map(y=>
+            echapper(y.titre)+" recule de "+y.avant+" à "+y.apres+" j").join(" · ")+
+            " — rejoués à l'intérieur de cet exercice.";
+          w.querySelector(".rz").appendChild(d);
+          setTimeout(()=>opts.noter(x[0]),1600);
+        }else opts.noter(x[0]);
+      });
+      g.appendChild(b);
+    });
+    apres.appendChild(g);
+    const s=document.createElement("small"); s.style.display="block"; s.style.marginTop="7px";
+    s.textContent="Le tempo retenu est celui du métronome ci-dessus.";
+    apres.appendChild(s);
+  }
+  return w;
+}
+
+/* ── révision depuis l'onglet Cartes ── */
 let file=[], enCours=null;
 function ouvrirRevision(){
   file=fileDuJour();
@@ -1051,40 +1098,12 @@ function carteSuivante(){
   if(!file.length){ finRevision(); return; }
   if(Moteur.on) Moteur.arreter();
   enCours=file.shift();
-  const c=enCours, ch=CHAPITRES[c.chapitre];
-  $("#rev-type").textContent="ch."+c.chapitre+" · "+c.type+
-    (c.statut==="neuf"?" · nouvelle":"")+(c._brasse?" · brassage":"");
-  $("#rev-reste").textContent=(file.length+1)+" restante"+(file.length?"s":"");
-  $("#rev-consigne").textContent=c.consigne;
-  $("#rev-rythme").textContent=c.rythme||"";
-  $("#rev-rythme").style.display=c.rythme?"block":"none";
-  $("#rev-metro").innerHTML=""; metronomeEmbarque(c,$("#rev-metro"));
-  $("#rev-chapitre").textContent = ch?ch.titre:"";
-  $("#rev-critere").textContent=c.critere;
-  $("#rev-critere").style.display="none";
-  $("#rev-rappel").innerHTML="";
-  $("#rev-avant").style.display="block"; $("#rev-apres").style.display="none";
+  const c=enCours;
+  rendreExercice(c,$("#zone-revision"),{
+    reste:(file.length+1)+" restante"+(file.length?"s":""),
+    noter:q=>{ if(q===0) file.push(c); carteSuivante(); }
+  });
 }
-$("#voir-critere").addEventListener("click",()=>{
-  $("#rev-critere").style.display="block";
-  $("#rev-avant").style.display="none"; $("#rev-apres").style.display="block";
-  [0,1,2,3].forEach(q=>{ $("#i"+q).textContent=apercu(enCours,q); });
-});
-$$(".notes button").forEach(b=>b.addEventListener("click",()=>{
-  const q=+b.dataset.q, c=enCours;
-  if(c.bpmTravail>c.bpmRecord) c.bpmRecord=c.bpmTravail;
-  delete c._brasse;
-  const credits=noter(c,q);
-  if(q===0) file.push(c);
-  if(credits.length){
-    const d=document.createElement("div"); d.className="rappel";
-    d.innerHTML="<b>Rappel contextuel.</b> "+credits.map(x=>
-      echapper(x.titre)+" recule de "+x.avant+" à "+x.apres+" j").join(" · ")+
-      " — ces items viennent d'être rejoués à l'intérieur de cet exercice.";
-    $("#rev-rappel").innerHTML=""; $("#rev-rappel").appendChild(d);
-    setTimeout(carteSuivante,1600);
-  }else carteSuivante();
-}));
 function finRevision(){
   if(Moteur.on) Moteur.arreter();
   $("#zone-revision").style.display="none"; $("#zone-liste").style.display="block";
@@ -1285,15 +1304,92 @@ let plan=[],iBloc=0,reste=0,tick=null,pause=false,debut=null;
 function lancerSeance(){
   plan=repartition(S.dureeSeance); iBloc=0; pause=false; debut=Date.now();
   $("#deroule").style.display="block"; $("#lancer-seance").disabled=true;
-  demarrerBloc(); $("#deroule").scrollIntoView({behavior:"smooth",block:"start"});
+  demarrerBloc();
+  const dz=$("#deroule");
+  if(dz.scrollIntoView) dz.scrollIntoView({behavior:"smooth",block:"start"});
 }
+/* pièce du chapitre : la carte de type « piece » si elle existe, sinon une carte volatile */
+function cartePiece(ch){
+  const dejaLa=S.cartes.filter(c=>c.chapitre===ch.id&&c.type==="piece")[0];
+  if(dejaLa) return dejaLa;
+  const p=ch.piece, temps = p.mesure==="3/4"?3:(p.mesure==="6/8"?6:4);
+  return {id:"piece-"+ch.id,chapitre:ch.id,type:"piece",main:"indifferent",titre:p.titre,
+    consigne:"La pièce du chapitre, en boucle, sans t'arrêter — même en cas d'accroc.",
+    critere:p.pourquoi,rythme:"",requiert:[],bpmCible:75,bpmTravail:75,bpmRecord:0,
+    statut:"apprise",ef:2.5,interval:0,due:null,reps:0,lapses:0,rappels:0,dernierVu:null,
+    preset:{bpm:75,temps,sub:1,swing:false,repere:"accent24",gap:false,gapJouees:2,
+            gapMuettes:2,ramp:false,rampTous:8,rampPas:2,rampMax:110}};
+}
+
+/* quel exercice concret pour chaque bloc */
+function contenuBloc(id){
+  const ch=chapitreActif();
+  if(id==="echauffement"){
+    const cand=["seuls-24","deux-quatre","pendule"].map(parId).filter(Boolean);
+    const c=cand.filter(x=>x.statut==="apprise")[0] || cand[cand.length-1];
+    return c?{carte:c,opts:{etiquette:"échauffement",sousTitre:"Installer le geste, sans rien apprendre"}}:null;
+  }
+  if(id==="drill"){
+    const f=fileDuJour();
+    const c = f.filter(x=>x.type==="mediator")[0] || f.filter(x=>x.type==="notion")[0] ||
+              S.cartes.filter(x=>x.chapitre===ch.id&&x.statut==="apprise"&&x.type!=="piece")
+                      .sort((a,b)=>(a.bpmRecord||0)-(b.bpmRecord||0))[0] || f[0];
+    return c?{carte:c,opts:{etiquette:"drill · "+c.type,sousTitre:"Au tempo où c'est propre, pas où c'est flatteur"}}:null;
+  }
+  if(id==="neuf"){
+    const c=neuves().filter(debloquee).sort((a,b)=>a.chapitre-b.chapitre)[0];
+    return c?{carte:c,opts:{etiquette:"nouveauté · ch."+c.chapitre,
+      sousTitre:"Comprendre avant de répéter",noter:true}}:null;
+  }
+  if(id==="grille"){
+    const c=cartePiece(ch);
+    return {carte:c,opts:{etiquette:"pièce du chapitre "+ch.id,grille:ch.piece.grille,
+      sousTitre:ch.piece.titre+" · "+ch.piece.mesure}};
+  }
+  return null;
+}
+
+let fileSeance=[];
+function suivanteSeance(){
+  const hote=$("#seance-contenu");
+  if(!fileSeance.length){
+    hote.innerHTML='<div class="carte"><div class="vide">File du jour terminée. Le temps qui reste est du rab : reprends la pièce du chapitre.</div></div>';
+    return;
+  }
+  if(Moteur.on) Moteur.arreter();
+  const c=fileSeance.shift();
+  rendreExercice(c,hote,{reste:(fileSeance.length+1)+" restante"+(fileSeance.length?"s":""),
+    noter:q=>{ if(q===0) fileSeance.push(c); suivanteSeance(); }});
+}
+
+function rendreContenuBloc(){
+  const hote=$("#seance-contenu"); hote.innerHTML="";
+  const b=plan[iBloc]; if(!b) return;
+  if(b.id==="cartes"){ fileSeance=fileDuJour(); suivanteSeance(); return; }
+  const co=contenuBloc(b.id);
+  if(!co){ hote.innerHTML='<div class="carte"><div class="vide">Rien à proposer ici aujourd\'hui — passe au bloc suivant.</div></div>'; return; }
+  const o=Object.assign({},co.opts);
+  if(o.noter){ delete o.noter; o.noter=()=>rendreContenuBloc(); }
+  rendreExercice(co.carte,hote,o);
+}
+
+function majJalons(){
+  const j=$("#jalons");
+  j.innerHTML=plan.map((x,i)=>'<i class="'+(i<iBloc?"fait":(i===iBloc?"encours":""))+'"></i>').join("");
+  let rest=Math.max(0,reste);
+  for(let i=iBloc+1;i<plan.length;i++) rest+=plan[i].min*60;
+  const tot=plan.reduce((s,x)=>s+x.min,0);
+  $("#seance-reste").textContent="reste "+Math.ceil(rest/60)+" min sur "+tot;
+}
+
 function demarrerBloc(){
   if(iBloc>=plan.length){ terminerSeance(); return; }
+  if(Moteur.on) Moteur.arreter();
   const b=plan[iBloc]; reste=b.min*60;
   $("#bloc-nom").textContent=(iBloc+1)+" / "+plan.length+" · "+b.nom;
   $("#bloc-detail").textContent=b.detail;
   $$("#plan .bloc-seance").forEach((el,i)=>{ el.classList.toggle("encours",i===iBloc); el.classList.toggle("fait",i<iBloc); });
-  $("#chrono").classList.remove("fini"); majChrono();
+  $("#chrono").classList.remove("fini"); majChrono(); majJalons(); rendreContenuBloc();
   clearInterval(tick);
   tick=setInterval(()=>{
     if(pause) return;
@@ -1307,6 +1403,7 @@ function majChrono(){
   $("#chrono").textContent=String(Math.floor(s/60)).padStart(2,"0")+":"+String(s%60).padStart(2,"0");
   const tot=plan[iBloc]?plan[iBloc].min*60:1;
   $("#barre-bloc").style.width=(100*(1-s/tot))+"%";
+  if(plan.length) majJalons();
 }
 function sonnerie(){
   initAudio();
@@ -1326,6 +1423,8 @@ $("#lancer-seance").addEventListener("click",lancerSeance);
 $("#reinit-seance").addEventListener("click",()=>{ S.dureeSeance=25; sauver(); rendreSeance(); });
 function terminerSeance(){
   clearInterval(tick);
+  if(Moteur.on) Moteur.arreter();
+  $("#seance-contenu").innerHTML="";
   const min=debut?Math.round((Date.now()-debut)/60000):0;
   if(min>=1){
     const h=aujourdhui(), d=S.journal[0];
