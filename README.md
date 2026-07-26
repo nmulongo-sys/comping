@@ -5,7 +5,7 @@ le seul réglage, tout le reste — plan de séance, quantité de nouveautés, f
 révision — en découle.
 
 **En ligne** : https://nmulongo-sys.github.io/comping/
-**Statut** : Passe 2 — piste médiator, chapitres, récursivité. Fichier HTML unique, aucune dépendance, fonctionne hors ligne.
+**Statut** : Passe 2.1 — piste médiator, chapitres, récursivité, repère à trois valeurs. Fichier HTML unique, aucune dépendance, fonctionne hors ligne.
 
 ## Utilisation
 
@@ -68,7 +68,11 @@ rattrape. C'est ce qui garantit que le cadran ne dérive pas du son.
 
 Conventions :
 - **Swing** : en subdivision croches, la croche forte occupe 2/3 du temps, la faible 1/3.
-- **Mode jazz** : seuls les temps 2 et 4 sont accentués (1180 Hz) ; 1 et 3 restent sourds.
+- **Repère** (`repere`), trois valeurs, trois exercices distincts :
+  `tous` — chaque temps sonne, 1 accentué ;
+  `accent24` — chaque temps sonne, 2 et 4 à 1180 Hz / gain 0,30 contre 700 Hz / 0,09 pour 1 et 3 ;
+  `seuls24` — 1 et 3 **ne produisent aucun son**, subdivisions comprises ; le compteur tourne.
+  Un temps silencieux est dessiné en contour vide, sur le cadran comme dans le bandeau.
 - **Trous silencieux** : `mesure % (jouées + muettes) >= jouées` coupe l'audio mais pas
   le compteur — le cadran continue de tourner, en pointillé et en gris.
 - **Tempo progressif** : évalué en fin de mesure uniquement.
@@ -135,7 +139,7 @@ personnel de l'utilisateur : l'app ne reproduit aucune partition sous droits.
 
 ### Piste médiator
 
-22 cartes sur 45 portent `main:"mediator"`, réparties sur les chapitres 2, 3 et 5, et
+22 cartes sur 46 portent `main:"mediator"`, réparties sur les chapitres 2, 3 et 5, et
 filtrables. La progression est écrite pour un guitariste **venant du classique** : la
 carte pivot est `med-appui`, qui présente l'attaque au médiator comme un transfert du
 geste de butée déjà connu, et le glossaire nomme explicitement l'atout (l'appui) et le
@@ -152,7 +156,7 @@ trou : `↓ ↓↑ ·↑ ↓↑`.
 Portés par les chapitres, de 0 à 6 : 0 socle mécanique · 1 accords ouverts et prise du
 médiator · 2 aller-retour, syncope, dynamique · 3 barrés et shell voicings ·
 4 Freddie Green et comping · 5 drop 2 / drop 3 · 6 modes et improvisation.
-Chapitres 0 à 5 peuplés (45 cartes) ; 6 à 11 déclarés avec leur pièce, sans cartes.
+Chapitres 0 à 5 peuplés (46 cartes) ; 6 à 11 déclarés avec leur pièce, sans cartes.
 
 ### Style
 
@@ -162,6 +166,24 @@ seule la typographie dégrade. Mobile d'abord : onglets bas fixes, cibles tactil
 `prefers-reduced-motion` respecté, focus clavier visible.
 
 ## Journal de développement
+
+### 2026-07-26 — Passe 2.1 : le repère devient un réglage à trois valeurs
+- **Défaut corrigé.** Le booléen `jazz` accentuait 2 et 4 mais laissait sonner tous les
+  temps, alors que le libellé, le glossaire et la consigne de la carte annonçaient un clic
+  sur 2 et 4 *seulement*. Le texte promettait un exercice que le code ne produisait pas.
+- Remplacement par `repere` à trois valeurs — `tous`, `accent24`, `seuls24` — dans le
+  moteur, le cadran, le bandeau embarqué et l'onglet Métronome (case à cocher remplacée
+  par un sélecteur). En `seuls24`, les temps 1 et 3 sont réellement muets, subdivisions
+  comprises, et s'affichent en contour vide.
+- Carte `deux-quatre` scindée en deux exercices distincts : « Accent sur 2 et 4 »
+  (`accent24`) puis « Sur 2 et 4 seulement » (`seuls24`), le second ayant le premier pour
+  prérequis. `ar-24` et `syncope-24` basculent en `seuls24` et dépendent désormais du
+  second ; `shuffle-mi` reste en `accent24`, un shuffle ayant besoin de sa pulsation.
+- Entrée de glossaire réécrite : « Les trois repères », qui présente les trois réglages
+  comme trois exercices de difficulté croissante plutôt que comme une option cosmétique.
+- Migration transparente à l'ouverture : `jazz:true` devient `accent24`, `jazz:false`
+  devient `tous`. Corpus porté à 46 cartes ; graphe de prérequis revalidé (aucun cycle,
+  toutes atteignables).
 
 ### 2026-07-26 — Passe 2 : médiator, chapitres, récursivité, métronome par exercice
 - **Piste médiator** ajoutée (22 cartes) : tenue, pression, angle, appui présenté comme
