@@ -107,6 +107,8 @@ input[type=range]{width:100%;accent-color:var(--or);height:32px}
 .temps-ligne i.on{background:var(--encre)}
 .temps-ligne i.on.accent{background:var(--or)}
 .temps-ligne i.muet{background:repeating-linear-gradient(90deg,var(--creme3) 0 3px,transparent 3px 6px)}
+.temps-ligne i.creux{background:transparent;box-shadow:inset 0 0 0 1px var(--creme3)}
+.temps-ligne i.creux.on{background:transparent;box-shadow:inset 0 0 0 2px var(--encre)}
 .embarque .reglages{font-size:.72rem;color:var(--encre-doux);margin-top:7px;line-height:1.45}
 .embarque .reglages b{color:var(--sepia);font-weight:600}
 
@@ -249,8 +251,9 @@ input[type=range]{width:100%;accent-color:var(--or);height:32px}
     <span class="etiquette" style="display:block;margin-top:9px">Subdivision</span><div class="puces" id="choix-sub"></div>
     <label class="bascule"><input type="checkbox" id="swing">
       <span><button class="terme" data-terme="swing">Croches swinguées</button> — rapport 2:1</span></label>
-    <label class="bascule"><input type="checkbox" id="jazz">
-      <span><button class="terme" data-terme="backbeat">Accent sur 2 et 4</button></span></label>
+    <span class="etiquette" style="display:block;margin-top:9px">Repère</span>
+    <div class="puces" id="choix-repere"></div>
+    <p style="margin-top:2px"><small><button class="terme" data-terme="backbeat">Ce que change chaque repère</button></small></p>
   </div>
   <div class="carte">
     <label class="bascule"><input type="checkbox" id="gap">
@@ -385,7 +388,7 @@ const CREDIT_RAPPEL      = 1.15; // extension d'un prérequis rejoué en context
 
 const GLOSSAIRE = {
   swing:{t:"Croches swinguées",c:"Deux croches ne durent pas le même temps : la première occupe environ deux tiers du temps, la seconde un tiers. Plus le tempo monte, plus le rapport s'aplatit vers l'égalité. Ici le clic place la croche faible aux deux tiers du temps."},
-  backbeat:{t:"Accent sur 2 et 4",c:"Le métronome ne sonne que sur 2 et 4 : c'est toi qui portes le 1, pas la machine. C'est l'exercice qui sépare le guitariste qui suit le tempo de celui qui le tient. Au début tu perdras le fil au bout de quatre mesures — c'est précisément la compétence à construire."},
+  backbeat:{t:"Les trois repères",c:"Le métronome peut te donner trois quantités d'information différentes. Elles ne s'équivalent pas : ce sont trois exercices distincts, du plus soutenu au plus exigeant.<br><br><b>1 · Tous les temps.</b> Chaque temps sonne, le 1 est accentué. La machine porte la mesure entière. C'est le réglage d'apprentissage : utile pour vérifier un doigté, inutile pour construire un tempo interne.<br><br><b>2 · Accent sur 2 et 4.</b> Tous les temps sonnent encore, mais 2 et 4 sont nettement plus forts et 1 et 3 s'effacent. Tu entends le contretemps du jazz sans perdre le filet de sécurité. C'est l'étape intermédiaire, et c'est ce qu'on entend dans la plupart des enregistrements.<br><br><b>3 · Sur 2 et 4 seulement.</b> Les temps 1 et 3 ne sonnent plus du tout. C'est toi qui les portes, pas la machine. C'est l'exercice qui sépare le guitariste qui suit le tempo de celui qui le tient — et au début tu perdras le fil au bout de quatre mesures. Le signe que tu as décroché est caractéristique : le clic « bascule » et tu te mets à l'entendre sur 1 et 3."},
   fantome:{t:"Cordes fantômes et trous silencieux",c:"La main droite ne s'arrête jamais, même sur les temps sans son : elle survole les cordes. Le geste devient un pendule et le rythme cesse d'être une suite de décisions.<br><br>Les trous silencieux prolongent l'idée : le clic se tait pendant N mesures, le temps continue. Si tu es en place au retour du clic, ton tempo interne existe."},
   srs:{t:"Révision espacée",c:"Chaque item porte son calendrier. Réussi facilement, il revient plus tard ; raté, il revient tout de suite. Tu ne révises jamais ce qui est acquis, seulement ce qui est en train de s'effacer."},
   recursivite:{t:"Comment l'acquis ne disparaît pas",c:"Quatre mécanismes, tous visibles dans l'app.<br><br><b>1 · Plafond d'intervalle.</b> Aucune carte ne dépasse 90 jours d'écart. Même parfaitement maîtrisé, un item repasse au moins une fois par trimestre : rien ne quitte définitivement la rotation.<br><br><b>2 · Rappel contextuel.</b> Chaque carte déclare ses prérequis. Quand tu réussis un exercice avancé, ses prérequis reçoivent un crédit : leur échéance recule de 15 %, parce qu'ils viennent d'être réellement joués — à l'intérieur du nouvel exercice. L'ancien reste vivant sans être redrillé à vide. C'est la récursivité : le neuf entretient le vieux.<br><br><b>3 · Entrelacement.</b> La file du jour alterne les types au lieu de les grouper. On progresse moins vite dans la séance, nettement mieux d'une semaine sur l'autre.<br><br><b>4 · Brassage.</b> S'il reste de la place, la séance repêche les items les plus anciennement revus, même non dus. Filet de sécurité contre les trous du calendrier."},
@@ -436,7 +439,7 @@ const CHAPITRES = [
 /* ── corpus : C(id, chapitre, type, main, titre, consigne, critère, bpm, opts) ── */
 function C(id,ch,type,main,titre,consigne,critere,bpm,opts){
   opts = opts||{};
-  const base = {bpm,temps:4,sub:1,swing:false,jazz:false,gap:false,gapJouees:2,gapMuettes:2,
+  const base = {bpm,temps:4,sub:1,swing:false,repere:"tous",gap:false,gapJouees:2,gapMuettes:2,
                 ramp:false,rampTous:8,rampPas:2,rampMax:bpm+30};
   return {id,chapitre:ch,type,main,titre,consigne,critere,bpmCible:bpm,
     rythme:opts.r||"",requiert:opts.req||[],preset:Object.assign(base,opts.p||{})};
@@ -448,10 +451,14 @@ const CORPUS = [
    "Main droite en va-et-vient continu sur Lam. Une mesure jouée, une mesure où la main poursuit son mouvement sans toucher les cordes.",
    "8 mesures alternées, la reprise tombe exactement sur le 1, sans hésitation ni accélération.",70,
    {p:{sub:2,gap:true,gapJouees:2,gapMuettes:2}}),
- C("deux-quatre",0,"notion","doigts","Clic sur 2 et 4",
-   "Métronome sur les seuls temps 2 et 4. Quatre noires par mesure sur Lam.",
-   "16 mesures d'affilée sans que le clic ne bascule sur le 1. Si tu perds le repère, tu recommences le décompte.",70,
-   {p:{jazz:true}}),
+ C("deux-quatre",0,"notion","doigts","Accent sur 2 et 4",
+   "Tous les temps sonnent, mais 2 et 4 sont nettement plus forts. Quatre noires par mesure sur Lam : place tes frappes sans compter.",
+   "16 mesures où tu sens 2 et 4 comme des appuis, sans avoir besoin de compter à voix haute.",70,
+   {p:{repere:"accent24"}}),
+ C("seuls-24",0,"notion","doigts","Sur 2 et 4 seulement",
+   "Les temps 1 et 3 ne sonnent plus du tout : c'est toi qui les portes. Quatre noires par mesure sur Lam.",
+   "16 mesures d'affilée sans que le clic ne bascule — si tu te mets à l'entendre sur 1 et 3, tu as décroché : reprends le décompte.",70,
+   {p:{repere:"seuls24"},req:["deux-quatre"]}),
  C("economie",0,"notion","doigts","Économie de mouvement",
    "Sur Mi, joue en croches en réduisant l'amplitude du poignet au strict nécessaire.",
    "La main ne dépasse pas la hauteur des cordes voisines et le son reste égal du grave à l'aigu.",80,{p:{sub:2}}),
@@ -461,7 +468,7 @@ const CORPUS = [
  C("tempo-interne",0,"notion","doigts","Tempo interne",
    "Trous silencieux : le clic disparaît deux mesures sur quatre. Continue seul, retrouve-le au retour.",
    "Quatre retours consécutifs où tu es encore exactement sur le temps.",70,
-   {p:{gap:true,gapJouees:2,gapMuettes:2},req:["pendule","deux-quatre"]}),
+   {p:{gap:true,gapJouees:2,gapMuettes:2},req:["pendule","seuls-24"]}),
 
  /* ── Ch.1 · accords ouverts ── */
  C("mi-la",1,"transition","doigts","Mi ↔ La","Change toutes les deux mesures, en noires, sans rupture du battement.",
@@ -520,10 +527,10 @@ const CORPUS = [
    "Alternance stricte bas-haut en croches sur la corde de La à vide.",
    "32 mesures, la frappe montante sonne aussi fort que la descendante.",70,
    {r:"↓↑ ↓↑ ↓↑ ↓↑",p:{sub:2},req:["med-appui"]}),
- C("ar-24",3,"mediator","mediator","Aller-retour sur 2 et 4",
-   "Même alternance, mais le métronome ne sonne que sur 2 et 4.",
+ C("ar-24",3,"mediator","mediator","Aller-retour sur 2 et 4 seuls",
+   "Même alternance, mais 1 et 3 ne sonnent plus.",
    "16 mesures sans dérive, la descendante reste sur les temps.",75,
-   {p:{sub:2,jazz:true},req:["ar-vide","deux-quatre"]}),
+   {p:{sub:2,repere:"seuls24"},req:["ar-vide","seuls-24"]}),
  C("ar-outside",3,"mediator","mediator","Outside picking",
    "Deux cordes voisines, deux notes chacune, attaque par l'extérieur de la paire.",
    "16 mesures en croches, aucune hésitation au changement de corde.",70,
@@ -564,9 +571,9 @@ const CORPUS = [
    "L'accord suivant est frappé sur le « et » du temps 2, puis tenu.",
    "8 mesures, l'anticipation ne raccourcit pas la mesure d'une croche.",70,
    {r:"↓ ↓·↑ · ·",p:{sub:2},req:["patron-trou"]}),
- C("syncope-24",4,"rythme","doigts","Syncope contre 2 et 4",
-   "Patron à trou, métronome sur 2 et 4 seulement.",
-   "16 mesures sans que le repère ne bascule.",70,{p:{sub:2,jazz:true},req:["patron-trou","deux-quatre"]}),
+ C("syncope-24",4,"rythme","doigts","Syncope contre 2 et 4 seuls",
+   "Patron à trou, avec 1 et 3 muets : le seul repère est celui que tu contredis.",
+   "16 mesures sans que le repère ne bascule.",70,{p:{sub:2,repere:"seuls24"},req:["patron-trou","seuls-24"]}),
  C("six-huit",4,"rythme","doigts","Balancement en 6/8",
    "Arpège descendant régulier, six croches par mesure, accent sur 1 et 4.",
    "16 mesures sans retomber dans un comptage binaire.",60,{p:{temps:6}}),
@@ -594,7 +601,7 @@ const CORPUS = [
  C("shuffle-mi",5,"piece","mediator","Shuffle en Mi",
    "Riff en quintes, palm mute, croches swinguées, médiator.",
    "3 grilles enchaînées à 90 bpm, l'étouffement tient du début à la fin.",90,
-   {p:{sub:2,swing:true,jazz:true},req:["pm-alterne","accent-1","ar-vide"]})
+   {p:{sub:2,swing:true,repere:"accent24"},req:["pm-alterne","accent-1","ar-vide"]})
 ];
 
 /* ═══════════════════════════════════════════════════════════
@@ -613,7 +620,7 @@ function carteNeuve(m){
 }
 function etatNeuf(){
   return {version:2,dureeSeance:25,
-    metro:{bpm:80,temps:4,sub:1,swing:false,jazz:true,gap:false,gapJouees:2,gapMuettes:2,
+    metro:{bpm:80,temps:4,sub:1,swing:false,repere:"accent24",gap:false,gapJouees:2,gapMuettes:2,
            ramp:false,rampTous:8,rampPas:2,rampMax:140},
     cartes:CORPUS.map(carteNeuve),journal:[],introJour:{date:null,n:0}};
 }
@@ -621,6 +628,12 @@ function etatNeuf(){
 let S;
 try{ const b=localStorage.getItem(CLE); S=b?JSON.parse(b):etatNeuf(); if(!S||!Array.isArray(S.cartes)) S=etatNeuf(); }
 catch(e){ S=etatNeuf(); }
+
+/* migration v2.0 -> v2.1 : le booléen jazz devient un repère à trois valeurs */
+(function migrerRepere(){
+  const m=o=>{ if(o && o.repere===undefined){ o.repere = o.jazz ? "accent24" : "tous"; delete o.jazz; } };
+  m(S.metro); S.cartes.forEach(c=>m(c.preset));
+})();
 
 /* fusion : le corpus fait autorité sur le contenu, la sauvegarde sur la progression */
 (function fusionner(){
@@ -656,6 +669,11 @@ function initAudio(){
   return ctx;
 }
 
+const REPERES=[{v:"tous",l:"tous les temps"},{v:"accent24",l:"accent 2 et 4"},{v:"seuls24",l:"2 et 4 seuls"}];
+const REPERE_TXT={tous:"clic sur tous les temps",accent24:"<b>accent sur 2 et 4</b>",seuls24:"<b>2 et 4 seulement</b>"};
+function estAccent(rep,i){ return (rep==="accent24"||rep==="seuls24") ? (i===1||i===3) : i===0; }
+function estSilencieux(rep,i){ return rep==="seuls24" && !(i===1||i===3); }
+
 const Moteur = {
   R:null, cible:null, on:false, timer:null,
   temps:0, sub:0, prochain:0, mesure:0, file:[],
@@ -667,10 +685,12 @@ const Moteur = {
 
   clic(temps,sub,t,muet){
     if(muet) return;
-    const R=this.R, back=R.jazz&&(temps===1||temps===3);
+    const rep=this.R.repere||"tous", back=(temps===1||temps===3);
+    if(rep==="seuls24" && !(back&&sub===0)) return;   // 1 et 3 ne sonnent pas du tout
     let f=760,v=0.16;
     if(sub!==0){ f=560; v=0.06; }
-    else if(R.jazz){ if(back){f=1180;v=0.30;} else {f=700;v=0.09;} }
+    else if(rep==="seuls24"){ f=1180; v=0.32; }
+    else if(rep==="accent24"){ if(back){f=1180;v=0.30;} else {f=700;v=0.09;} }
     else if(temps===0){ f=1500; v=0.34; }
     else { f=900; v=0.18; }
     const o=ctx.createOscillator(), g=ctx.createGain();
@@ -762,13 +782,17 @@ function dessinerCadran(){
   cx.setLineDash(muetAff?[4,6]:[]); cx.stroke(); cx.setLineDash([]);
   for(let i=0;i<R.temps;i++){
     const a=-Math.PI/2+i*(Math.PI*2/R.temps), x=c+Math.cos(a)*ray, y=c+Math.sin(a)*ray;
-    const accent = R.jazz ? (i===1||i===3) : (i===0), actif=(i===tAff);
+    const rep=R.repere||"tous", accent=estAccent(rep,i), creux=estSilencieux(rep,i), actif=(i===tAff);
     const r0=(accent?11:7)+(actif?5*flash:0);
     cx.beginPath(); cx.arc(x,y,r0,0,Math.PI*2);
-    cx.fillStyle = actif ? (muetAff?"#B9A88C":(accent?"#B8892B":"#2B2320")) : (accent?"#DFD1B8":"#EBE0CD");
-    cx.fill();
-    if(accent&&!actif){ cx.strokeStyle="#B8892B"; cx.lineWidth=1.2; cx.stroke(); }
-    cx.fillStyle=actif?"#FBF7EE":"#8B6F47"; cx.font="600 11px 'Work Sans',sans-serif";
+    if(creux){
+      cx.strokeStyle = actif ? "#2B2320" : "#DFD1B8"; cx.lineWidth = actif?2:1.2; cx.stroke();
+    }else{
+      cx.fillStyle = actif ? (muetAff?"#B9A88C":(accent?"#B8892B":"#2B2320")) : (accent?"#DFD1B8":"#EBE0CD");
+      cx.fill();
+      if(accent&&!actif){ cx.strokeStyle="#B8892B"; cx.lineWidth=1.2; cx.stroke(); }
+    }
+    cx.fillStyle=(actif&&!creux)?"#FBF7EE":"#8B6F47"; cx.font="600 11px 'Work Sans',sans-serif";
     cx.textAlign="center"; cx.textBaseline="middle";
     if(r0>=9||actif) cx.fillText(String(i+1),x,y+0.5);
   }
@@ -808,7 +832,9 @@ function metronomeEmbarque(carte,hote){
     ligne.innerHTML="";
     for(let i=0;i<R.temps;i++){
       const b=document.createElement("i");
-      if(R.jazz ? (i===1||i===3) : i===0) b.classList.add("accent");
+      const rp=R.repere||"tous";
+      if(estAccent(rp,i)) b.classList.add("accent");
+      if(estSilencieux(rp,i)) b.classList.add("creux");
       ligne.appendChild(b);
     }
   })();
@@ -816,7 +842,7 @@ function metronomeEmbarque(carte,hote){
   function decrire(){
     const p=["<b>"+R.temps+"/4</b>", ["noires","croches","triolets","doubles"][R.sub-1]];
     if(R.swing) p.push("<b>swing</b>");
-    if(R.jazz)  p.push("<b>accent 2 et 4</b>");
+    p.push(REPERE_TXT[R.repere||"tous"]);
     if(R.gap)   p.push("<b>trous "+R.gapJouees+" jouées / "+R.gapMuettes+" muettes</b>");
     if(R.ramp)  p.push("<b>progressif</b> +"+R.rampPas+" toutes les "+R.rampTous+" mes., plafond "+R.rampMax);
     el.querySelector(".reglages").innerHTML="Préréglé pour cet exercice : "+p.join(" · ")+
@@ -886,12 +912,13 @@ function relance(){
 }
 construirePuces($("#choix-temps"),[{l:"4/4",v:4},{l:"3/4",v:3},{l:"6/8",v:6},{l:"5/4",v:5},{l:"2/4",v:2}],()=>M.temps,v=>M.temps=v,relance);
 construirePuces($("#choix-sub"),[{l:"noires",v:1},{l:"croches",v:2},{l:"triolets",v:3},{l:"doubles",v:4}],()=>M.sub,v=>M.sub=v,relance);
+construirePuces($("#choix-repere"),REPERES.map(r=>({l:r.l,v:r.v})),()=>M.repere,v=>M.repere=v,relance);
 function lier(id,champ,apres){
   const el=$(id), chk=el.type==="checkbox";
   el[chk?"checked":"value"]=M[champ];
   el.addEventListener("change",()=>{ M[champ]=chk?el.checked:(+el.value||0); sauver(); if(apres)apres(); relance(); });
 }
-lier("#swing","swing"); lier("#jazz","jazz");
+lier("#swing","swing");
 lier("#gap","gap",()=>$("#gap-reglages").style.display=M.gap?"block":"none");
 lier("#gap-jouees","gapJouees"); lier("#gap-muettes","gapMuettes");
 lier("#ramp","ramp",()=>$("#ramp-reglages").style.display=M.ramp?"block":"none");
@@ -1204,7 +1231,7 @@ $("#ajouter-carte").addEventListener("click",()=>{
    ═══════════════════════════════════════════════════════════ */
 function BLOCS_DEF(){ return [
  {id:"echauffement",nom:"Échauffement",part:.12,
-  detail:"Métronome sur 2 et 4, main droite en pendule, un seul accord. On n'apprend rien : on installe le geste."},
+  detail:"Repère sur 2 et 4, main droite en pendule, un seul accord. On n'apprend rien : on installe le geste."},
  {id:"drill",nom:"Drill technique",part:.20,
   detail:"Un point isolé, au tempo où c'est propre — pas au tempo où c'est flatteur. Le travail du médiator se fait ici."},
  {id:"neuf",nom:"Nouveauté",part:.20,
