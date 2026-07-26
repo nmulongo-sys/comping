@@ -4,7 +4,7 @@ Application d'entraînement quotidien à la guitare rythmique : le temps disponi
 le seul réglage, tout le reste — plan de séance, quantité de nouveautés, file de
 révision — en découle.
 
-**En ligne** : `https://nmulongo-sys.github.io/comping/` *(à confirmer selon le nom réel du dépôt)*
+**En ligne** : https://nmulongo-sys.github.io/comping/
 **Statut** : Passe 2 — piste médiator, chapitres, récursivité. Fichier HTML unique, aucune dépendance, fonctionne hors ligne.
 
 ## Utilisation
