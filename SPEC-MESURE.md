@@ -1,5 +1,15 @@
 # comping — spécification du moteur de mesure intégré
 
+> Version 0.10 — 2026-07-28. Fondations de l'étape 7, posées après lecture du code :
+> quatre manques relevés dans `index.html`, tranchés ici. Le quadruplet ne se lit pas tel
+> quel sur la carte — §6.1 en donne la dérivation —, et la comparabilité passe au **palier
+> de 4 bpm** (§6.2), sans quoi le moindre mouvement du curseur de tempo fragmentait
+> l'historique et le §10 n'aurait jamais rien montré. L'échelon **se lit, il ne se stocke
+> pas** (§7.4) : `soutien` et `repere` disaient la même chose et auraient divergé au
+> premier réglage manuel. Le cycle du §8 devient un **réducteur pur** (§8.1), donc
+> testable sous Node malgré l'étape 7. §11 réécrit : `S.mesures` n'existait pas, et son
+> schéma ne portait pas les champs que `serieAcquise` lit. §10.7 reçoit trois décisions de
+> plus — numérotation 1–4 affichée, `mesurable` par défaut à `true`, libellés alignés.
 > Version 0.9.1 — 2026-07-28. §14 rafraîchi : les deux points de `pasClic` n'y figurent
 > plus comme « à arbitrer » (ils le sont, §7.3), le compte de tests est à jour, et
 > l'étape 7 — branchement du moteur dans l'interface — est nommée au lieu d'être
@@ -376,7 +386,7 @@ Repris d'`analyse-attaque` v1.5, sans changement :
 contexte: {
   tempo:        88,          // bpm de la carte
   subdivision:  "croches",   // valeur rythmique demandée → pas_grille
-  repere:       "temps",     // ce qui est entendu → pas_clic
+  repere:       "accent24",  // ce qui est entendu → pas_clic (§6.1)
   soutien:      2            // échelon 0..5, §7
 }
 ```
@@ -389,6 +399,45 @@ l'historique de mentir quand une carte monte d'échelon.
 Corollaire : monter d'échelon **repart d'un historique vide** pour ce couple. L'app doit
 l'annoncer (« nouvelle condition — l'historique précédent reste consultable, il ne sera pas
 mélangé »).
+
+### 6.1 Dérivation depuis la carte — **[V]** 2026-07-28
+
+Le quadruplet **n'est pas stocké** sur la carte : il se dérive de son préréglage, et la
+dérivation n'est l'identité pour aucun de ses quatre termes.
+
+| Terme | Source | Conversion |
+|---|---|---|
+| `tempo` | `carte.bpmTravail` | jamais `bpmCible`, qui est la consigne et non ce qui a été joué. Conservé exact au journal, comparé au palier (§6.2). |
+| `subdivision` | `carte.preset.sub` (1…4) | table **inverse** de `SUBDIVISIONS` : 1 → `noires`, 2 → `croches`, 3 → `triolets`, 4 → `doubles` |
+| `repere` | `carte.preset.repere` | aucune. Les trois valeurs réelles du code sont `tous`, `accent24`, `seuls24` — l'exemple `"temps"` de la v0.9.1 ne correspondait à rien. |
+| `soutien` | `echelonDe(carte.preset)` | **calculé**, jamais stocké (§7.4) |
+
+`quadrupletDe(carte)` est **pure**, entre au bloc de mesure et à la liste `EXPORTES`. Elle
+renvoie `null` dès qu'un terme manque — jamais un quadruplet partiel, qui ferait comparer
+en silence deux mesures non comparables, exactement ce que le §6 interdit.
+
+### 6.2 Comparabilité par palier de tempo — **[V]** 2026-07-28
+
+Relevé dans le code, pas supposé : `carte.bpmTravail` est réécrit **à chaque mouvement du
+curseur** du métronome embarqué, et le mode progressif le fait dériver seul en cours de
+séance. Comparer les tempos à l'unité près rendait l'égalité du quadruplet pratiquement
+inatteignable — trois mesures concluantes au même bpm exact sont un événement rare.
+Conséquence : le plafond du §10.3 ne se serait presque jamais levé, le marqueur fantôme du
+§10.4 aurait été presque toujours absent. **Le §10 aurait fonctionné sans jamais rien
+montrer.**
+
+**Règle retenue : la mesure enregistre le tempo exact, la comparabilité se fait au palier
+de 4 bpm** — `palierTempo(bpm) = Math.round(bpm/4)*4`.
+
+- 4 bpm est déjà le pas de progression du §7.2 : aucune grandeur nouvelle n'entre.
+- C'est un **partitionnement**, donc une relation d'équivalence, et le regroupement en
+  séries reste transitif. Une tolérance de ±2 bpm ne l'aurait pas été : elle aurait produit
+  des « séries » qui ne se ferment pas, où A comparable à B et B à C sans que A le soit à C.
+- `memeQuadruplet` compare désormais `palierTempo(a.tempo)` à `palierTempo(b.tempo)`, et
+  non plus `a.tempo === b.tempo`. Les trois autres termes restent comparés à l'identique.
+
+Le tempo exact reste au journal : c'est lui, et non le palier, qui sert au garde-fou des
+3 % du §9.1.
 
 ---
 
@@ -489,6 +538,35 @@ régulier : la grille interne continue seule et la mesure reste possible (§7, �
 5), mais la question de savoir si `seuls24` a un sens musical en 6/8 n'est pas une question
 de mesure, et n'est pas tranchée ici.
 
+### 7.4 L'échelon se lit, il ne se stocke pas — **[V]** 2026-07-28
+
+`soutien` et `repere` décrivent la même réalité : le tableau du §7 le dit lui-même —
+l'échelon 2 **est** `accent24`, l'échelon 3 **est** `seuls24`. Stocker `carte.soutien` à
+côté de `carte.preset.repere`, c'était deux vérités à tenir synchronisées, qui auraient
+divergé au premier réglage manuel du métronome. **Aucun champ n'est ajouté à la carte :
+l'échelon est une lecture du préréglage**, par `echelonDe(preset)`, pure.
+
+Ordre de lecture, et il n'est pas commutatif :
+
+| Test, dans cet ordre | Échelon |
+|---|---|
+| `preset.muet` | 5 — sans clic, grille interne maintenue |
+| `preset.gap` | 4 — clic troué |
+| `repere === "seuls24"` | 3 |
+| `repere === "accent24"` | 2 |
+| `sub > 1` | 0 — temps + subdivision |
+| sinon | 1 — temps seuls |
+
+**Le repère se lit avant la subdivision, et c'est cet ordre qui rend la dérivation
+correcte.** Le corpus contient des cartes réglées à `sub:2` **et** `repere:"seuls24"` : les
+croches y sont réglées mais **inaudibles**, `Moteur.clic()` les écarte avant d'émettre.
+Lire `sub` d'abord aurait donné l'échelon 0 — donc un `pas_clic` en croches — pour une
+carte où l'on n'entend que 2 et 4. Le champ `sub` ment sur ce qui est entendu ; seule la
+lecture croisée donne le bon échelon, donc le bon `pas_clic` (§7.3).
+
+Un seul champ manque au préréglage pour couvrir l'échelle entière : **`preset.muet`**
+(booléen, défaut `false`), qui porte l'échelon 5. Il coupe l'émission, jamais la grille (§1).
+
 ---
 
 ## 8. Cycle d'une carte mesurée
@@ -505,6 +583,46 @@ présentation ──▶ décompte 2 mesures ──▶ MESURE 45 s ──▶ bila
   revient en main.
 - Arrêt manuel possible à tout instant ; les gestes déjà collectés sont conservés et le
   bilan s'affiche si les conditions du §9.1 sont réunies.
+
+### 8.1 Le cycle est un réducteur pur — **[V]** 2026-07-28
+
+L'étape 7 est la première à toucher le DOM ; la règle « tests avant code » (§13) ne
+s'abandonne pas pour autant. Le cycle ci-dessus s'écrit donc comme une **transition pure**,
+`cycleMesure(etat, evt) → etat′`, sans référence au DOM, à `window`, à `ctx` ni à `S`.
+Elle entre dans le bloc extrait et devient testable sous Node comme le reste. Ce qui reste
+dehors — minuteries, audio, écritures d'écran — est de la **plomberie**, couverte par le
+test 9 et par elle seule.
+
+**États** : `presentation` · `decompte` · `mesure` · `bilan` · `abandon`.
+
+**Évènements**, tous porteurs de leur temps en secondes d'horloge audio — la seule du
+projet (§1) :
+
+| Évènement | Effet |
+|---|---|
+| `{type:"demarrer"}` | `presentation` → `decompte` |
+| `{type:"clic", mesure, temps, sub, t}` | en `decompte` seulement. Au temps 1 (`temps===0 && sub===0`) de la **troisième** mesure : pose `ancre = t`, passe en `mesure`. |
+| `{type:"geste", t}` | en `mesure` seulement : empile. Ignoré ailleurs — un geste joué pendant le décompte n'existe pas. |
+| `{type:"horloge", t}` | en `mesure` : si `t - ancre >= DUREE_MESURE_S`, passe en `bilan`. |
+| `{type:"arret"}` | `bilan` si `gestes.length >= GESTES_MIN`, sinon `abandon`. |
+
+**Invariants — tenus par les tests avant de l'être par le code :**
+
+1. `ancre` n'est jamais posée sur le décompte. Deux mesures entières sont consommées, quel
+   que soit le nombre de temps et la subdivision.
+2. Aucun geste n'est retenu avant `ancre`, ni après `ancre + DUREE_MESURE_S`.
+3. `abandon` ne produit **aucune note et aucune entrée au journal** : la carte revient en
+   main, notée à la main (§8). Ce n'est pas une mauvaise note, c'est une mesure qui n'a pas
+   eu lieu — même distinction qu'au §10.5.
+4. La transition est **totale** : un évènement inattendu dans un état donné renvoie l'état
+   inchangé. Jamais d'exception, jamais d'état intermédiaire.
+
+**Constantes** : `DUREE_MESURE_S = 45`, `MESURES_DECOMPTE = 2`, `GESTES_MIN = 24` **[P]**.
+
+`GESTES_MIN` remplace le `24` écrit en clair dans `concluante`. Le seuil d'abandon du §8 et
+le seuil de concluance du §9.1 sont **le même nombre** ; écrit à deux endroits, l'un des
+deux finirait par bouger seul. Même discipline que `serieAcquise`, compteur unique du
+§10.3 et du §7.2.
 
 ---
 
@@ -619,6 +737,30 @@ boutons, sans les remplacer.
 Deux contraintes fermes : les quatre plages portent leur libellé **écrit** sous la barre —
 jamais la couleur seule —, et le marqueur ne s'anime pas sous `prefers-reduced-motion`.
 
+#### 10.4.1 Géométrie, écrite une fois — **[V]** 2026-07-28
+
+La position sur la barre est une fonction pure, `positionBarre(rho)`, qui renvoie une
+fraction de 0 (bord gauche) à 1 (bord droit) :
+
+`positionBarre(ρ) = (0,12 − ρ) / (0,12 − 0,03)`, bornée à `[0, 1]`.
+
+Elle renvoie `null` si ρ n'est pas un nombre fini — **jamais 0**, qui se dessinerait au
+bord gauche et se lirait « très dispersé » là où il n'y a pas de mesure.
+
+Points remarquables, calculés une fois, jamais recalculés à la main dans le rendu :
+
+| Repère | ρ | Position |
+|---|---|---|
+| bord gauche | 12 % | 0 |
+| frontière Débuts / En progrès | 8 % | 0,444 |
+| « ton habitude », pointillé fixe | 6 % | 0,667 |
+| frontière Bien / Acquis, début de la zone hachurée | 4,5 % | 0,833 |
+| bord droit | 3 % | 1 |
+
+Le sens de lecture est celui du progrès, et c'est **le même que celui de la numérotation
+des boutons** (§10.7 point 5) : les deux montent vers la droite. Une seule direction à
+apprendre, pas deux.
+
 ### 10.5 Le cas non concluant n'est pas une mauvaise note
 
 Distinction à ne pas rater à l'implémentation. « Débuts » signifie *représenter tout de
@@ -635,8 +777,9 @@ crédit de rappel ×1,15. La mesure alimente son entrée, elle ne le remplace pa
 
 ### 10.7 Décisions d'implémentation — livrées le 2026-07-28
 
-Quatre choix que les §10.2 et §10.3 laissaient ouverts, tranchés à l'écriture et tenus
-par les six tests T5, T5d, T8b, T8c, §10.2 et §10.2b.
+Sept choix que les §10.2 et §10.3 laissaient ouverts. Les quatre premiers ont été
+tranchés à l'écriture du code et sont tenus par les six tests T5, T5d, T8b, T8c, §10.2 et
+§10.2b ; les trois derniers sont arbitrés le 2026-07-28, avant l'étape 7.
 
 1. **Bornes de la colonne « % en cible ».** La table les donne en approximatif
    (≳ 80, ≈ 68–80, ≈ 55–68, ≲ 55) parce qu'elles décrivent une attente, pas un critère.
@@ -661,46 +804,98 @@ par les six tests T5, T5d, T8b, T8c, §10.2 et §10.2b.
    `serieAcquise(historique, quadruplet)` : c'est **le** compteur du §7.2, appelé au même
    endroit par les deux règles, et non deux comptages à tenir synchronisés.
 
-Ce que ces quatre points ne tranchent pas : la latence n'entre toujours dans aucun calcul
+5. **Numérotation affichée, 1 à 4.** Les quatre boutons portent leur rang devant le
+   libellé — **1 Débuts · 2 En progrès · 3 Bien · 4 Acquis** —, croissant de gauche à
+   droite, dans le même sens que la barre du §10.4. Quatre libellés seuls ne disent pas
+   lequel est au-dessus de l'autre ; le rang le dit sans commentaire. Le `q` 0–3 du moteur
+   SM-2 reste **interne et jamais affiché** : deux numérotations visibles pour quatre
+   boutons vaudraient moins qu'aucune. Correspondance directe et fixe — rang affiché =
+   indice dans `NOTES` + 1 = `q` + 1.
+6. **`mesurable` par défaut à `true`.** Le champ vit dans le corpus, pas dans la
+   progression ; seules les cartes qui ne se mesurent pas le déclarent à `false`. Motif :
+   une carte oubliée doit tomber du côté mesurable, où l'anomalie se voit dès la première
+   prise, et non du côté muet, où elle ne se verrait jamais. Le test 6 porte sur les cartes
+   déclarées `false`, pas sur un défaut.
+7. **Libellés alignés sur le §10.2.** `index.html` affichait encore « Encore · Dur · Bien ·
+   Facile », qui qualifie **la tentative** ; le §10.2 impose « Débuts · En progrès · Bien ·
+   Acquis », qui qualifie **la carte**. L'app suit la spec. L'indice dans `NOTES` tombait
+   déjà juste sur `q`, par coïncidence : pré-cocher `debuts` aurait allumé un bouton nommé
+   « Encore ».
+
+Ce que ces sept points ne tranchent pas : la latence n'entre toujours dans aucun calcul
 (§10.1), et le motif renvoyé reste `null` dès que la mesure est concluante — il ne porte
 que le motif de rejet du §9.1, jamais une explication de la note.
 
 ---
 
-## 11. Stockage — `comping_v2`
+## 11. Stockage — `comping_v3`
+
+**Rien de ce qui suit n'existe encore dans `index.html`** : `etatNeuf()` s'arrête à
+`calibration:{}`. C'est le premier morceau de l'étape 7, et ce n'est pas un hasard —
+`serieAcquise` est écrite et testée depuis le 2026-07-28 mais **n'a aucun appelant
+possible** tant que `S.mesures` n'existe pas. Sans lui, le plafond du §10.3 ne se lève
+jamais et le marqueur fantôme du §10.4 est toujours absent : rien du §10 ne s'observe.
 
 Ajouts au schéma existant, aucune suppression :
 
 ```js
 {
+  version: 3,
   calibration: { "<empreinte>": { latence_ms, dispersion_ms, n, date, sr } },
 
   mesures: [{
-    carte:     "ch03-c07",
-    date:      "2026-07-27T21:14:02Z",
-    contexte:  { tempo, subdivision, repere, soutien },   // §6
-    n_gestes:  41,
-    passage:   2,
-    R:         0.79,
-    p:         3.1e-9,
+    carte:      "ch03-c07",
+    date:       "2026-07-27T21:14:02Z",
+    quadruplet: { tempo, subdivision, repere, soutien },   // §6, §6.1
+    concluante: true,          // verdict du §9.1, STOCKÉ — jamais recalculé
+    motif:      null,          // motif de rejet si concluante === false
+    n_gestes:   41,
+    R:          0.79,
+    p:          3.1e-9,
     sigma_locale_ms: 21.4,
-    rho:       0.0571,
-    cible_pct: 0.72,
-    biais_ms:  187.9,          // brut, non corrigé
-    calibre:   true,           // latence disponible au moment de la mesure
-    fen_ms:    22.5,
+    rho:        0.0571,
+    pct_cible:  72.0,
+    biais_ms:   187.9,         // brut, non corrigé
+    calibre:    true,          // latence disponible au moment de la mesure
+    fen_ms:     22.5,
     note_proposee: "bien",
     note_retenue:  "bien"      // ce que Jean a validé
   }]
 }
 ```
 
+**Trois noms corrigés depuis la v0.9.1**, et ce ne sont pas des détails de forme : le
+schéma d'origine écrivait `contexte` et `cible_pct`, et ne portait aucun champ
+`concluante`. Or `serieAcquise` lit `m.quadruplet`, `m.concluante` et `m.rho`, et `stats()`
+renvoie `pct_cible`. Le schéma et le code ne se seraient rencontrés nulle part : chaque
+entrée aurait été lue comme non concluante, le plafond du §10.3 aurait tenu pour toujours,
+et **aucune erreur ne se serait affichée**. C'est la forme de panne que le §14 « rien :
+renvoyer `null` et le dire » cherche justement à écarter.
+
+**`concluante` est stocké, jamais recalculé à la lecture** : le verdict du §9.1 dépend du
+tempo réglé au moment de la prise, qui n'est plus disponible ensuite.
+
+**Champs ajoutés hors de `mesures`** :
+
+| Champ | Défaut | Motif |
+|---|---|---|
+| `carte.mesurable` | `true` (§10.7 point 6) | vient du corpus, recopié par `fusionner()` comme les autres champs de contenu |
+| `carte.preset.muet` | `false` | porte l'échelon 5 (§7.4) |
+
+**Aucun champ `carte.soutien`** : l'échelon se lit (§7.4).
+
+**Migration v2.2 → v2.3**, dans le style des précédentes, idempotente :
+
+- `if(!Array.isArray(S.mesures)) S.mesures = [];`
+- `muet` initialisé à `false` s'il est absent, sur `S.metro` et sur chaque `carte.preset` ;
+- `mesurable` recopié depuis le corpus dans `fusionner()`, par `m.mesurable !== false`.
+
+**Purge** : les mesures au-delà de 400 entrées sont élaguées par la plus ancienne, sauf une
+par quadruplet, conservée comme point d'origine **[P]**.
+
 **`note_proposee` et `note_retenue` sont toutes deux conservées.** L'écart entre les deux,
 accumulé, est le seul moyen de savoir si la table du §10.2 est juste. C'est le journal de
 bord de la règle de notation elle-même.
-
-**Purge** : les mesures au-delà de 400 entrées sont élaguées par la plus ancienne, sauf
-une par quadruplet, conservée comme point d'origine **[P]**.
 
 ---
 
@@ -732,6 +927,23 @@ une par quadruplet, conservée comme point d'origine **[P]**.
 | 8 | Deux quadruplets différents dans l'historique | deux séries distinctes, jamais moyennées |
 | 9 | `node --check` + intégrité des références DOM + parcours jsdom | sans erreur |
 
+
+Tests ajoutés par l'étape 7 — tous sur des fonctions **pures**, donc écrits avant le
+branchement et rouges jusqu'à ce que le code existe (§13, règle inchangée) :
+
+| # | Test | Attendu |
+|---|---|---|
+| 10 | `quadrupletDe` sur une carte à `sub:2, repere:"seuls24"` | `soutien: 3`, jamais 0 — le repère se lit avant la subdivision (§7.4) |
+| 11 | `quadrupletDe` sur une carte à laquelle un terme manque | `null`, jamais un quadruplet partiel |
+| 12 | `memeQuadruplet` à 78 et 80 bpm, autres termes égaux | `true` — même palier (§6.2) |
+| 13 | `memeQuadruplet` à 76 et 80 bpm | `false` — paliers voisins mais distincts |
+| 14 | `cycleMesure` : décompte de 2 mesures, en 3/4 puis en 4/4 | `ancre` posée au temps 1 de la 3ᵉ mesure dans les deux cas, jamais avant |
+| 15 | `cycleMesure` : gestes émis pendant le décompte, puis après `ancre + 45 s` | ni les uns ni les autres n'entrent au bilan |
+| 16 | `cycleMesure` : `arret` à 23 gestes, puis à 24 | `abandon`, puis `bilan` — la frontière est `GESTES_MIN`, pas un nombre écrit deux fois |
+| 17 | `positionBarre` aux cinq points remarquables du §10.4.1 | 0 · 0,444 · 0,667 · 0,833 · 1, et `null` sur ρ non fini |
+| 18 | `echelonDe` sur les six lignes du tableau du §7.4 | l'échelon annoncé, pour chacune |
+| 19 | Rejeu de T8 après le passage au palier | les séries d'origine restent distinctes : le palier élargit la comparabilité, il ne la casse pas |
+
 ---
 
 ## 14. Ordre de réalisation proposé
@@ -760,12 +972,27 @@ une par quadruplet, conservée comme point d'origine **[P]**.
 6. `FEN` relative activée **le jour où la seconde série confirme les 6 %**, pas avant.
    Une seule ligne à changer, `FEN_RELATIVE`. Conditionnée à la capture, pas au calendrier.
 7. **Branchement du moteur dans l'interface** — la seule étape entièrement neuve qui
-   reste, et la première qui ne soit pas une fonction pure. Trois morceaux, spécifiés mais
-   non écrits : le cycle de mesure d'une carte (§8 : décompte non mesuré, 45 s, bilan), la
-   barre graduée du §10.4 (axe 12 % → 3 %, repère « ton habitude » à 6 %, marqueur fantôme
-   au même quadruplet, zone « Acquis » hachurée tant que le plafond tient), et le masquage
-   du biais en l'absence de calibration (§2.3 — `calibrationCourante()` est exposée et
-   n'a toujours aucun appelant, point ouvert j).
+   reste, et la première qui ne soit pas une fonction pure. La lecture du code, le
+   2026-07-28, y a ajouté **quatre prérequis** que la rédaction initiale ne voyait pas,
+   dont trois sont bloquants. Ordre imposé, chacun inutilisable sans le précédent :
+
+   **7a — stockage (§11).** `S.mesures` n'existe pas. Tant qu'il n'existe pas,
+   `serieAcquise` n'a aucun appelant possible, le plafond du §10.3 ne se lève jamais, le
+   marqueur fantôme est toujours absent : **rien du §10 ne s'observe.** Premier morceau,
+   sans discussion.
+
+   **7b — dérivation (§6.1, §6.2, §7.4).** Trois fonctions pures, trois entrées de plus à
+   `EXPORTES` : `quadrupletDe`, `palierTempo`, `echelonDe`. Aucun champ ajouté à la carte
+   hors `mesurable` et `preset.muet`. `memeQuadruplet` passe au palier.
+
+   **7c — cycle de mesure (§8, §8.1).** Écrit en réducteur pur, donc couvert par la suite
+   Node ; seule la plomberie reste dehors. `GESTES_MIN` remplace le `24` en clair de
+   `concluante`.
+
+   **7d — barre graduée (§10.4, §10.4.1) et masquage du biais (§2.3).** La géométrie est
+   pure ; le rendu ne l'est pas. Le masquage solde le point ouvert **j** :
+   `calibrationCourante()` est exposée depuis le 2026-07-27 et n'a toujours aucun appelant.
+   Seul morceau qui touche vraiment l'écran.
 
 ---
 
@@ -782,7 +1009,7 @@ une par quadruplet, conservée comme point d'origine **[P]**.
 | k | Sensibilité de 2,5 trop haute pour le jeu rapide et nuancé | B5 : 84 détections brutes pour 120 attaques jouées. La sous-détection ne se corrige par aucun regroupement. Conditionne la validité de toute mesure hors corde à vide |
 | h | Première calibration réelle | **clos et soldé** (§2.5) : **200 ms, dispersion 3 ms, 24/24, enregistrée le 2026-07-27** sur l'appareil de référence — bien au-dessus des 20 ms, le son passe par l'air |
 | i | σ de phase contre σ_locale (§4.4) | conditionne la colonne « % en cible » du §10.2 |
-| j | Consommateurs du §2.3 | `calibrationCourante()` est exposée, rien ne l'appelle encore : le masquage du biais arrive à l'étape 5 |
+| j | Consommateurs du §2.3 | `calibrationCourante()` est exposée, rien ne l'appelle encore : le masquage du biais arrive en **7d** (§14) |
 | f | Origine des doublons à 59–75 ms | **tranché** : redéclenchement sur la résonance du corps à la sortie du temps réfractaire, pas le balayage des cordes — un accord plaqué ne produit que 1,1 détection par geste. `fusion_ms = 120` les absorbe. |
 
 ---
