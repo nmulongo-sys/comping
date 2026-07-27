@@ -1523,6 +1523,110 @@ function memeQuadruplet(a, b){
       && a.soutien === b.soutien;
 }
 
+/* ── §8, §8.1 — cycle d'une carte mesurée, écrit en RÉDUCTEUR PUR ───────────
+
+   L'étape 7 est la première à toucher le DOM ; la règle « tests avant code » du
+   §13 ne s'abandonne pas pour autant. Le cycle s'écrit donc comme une
+   transition pure — cycleMesure(etat, evt) → etat′ — sans DOM, sans window,
+   sans ctx et sans S. Ce qui reste dehors (minuteries, audio, écritures
+   d'écran) est de la plomberie.
+
+   La transition est TOTALE (§8.1 invariant 4) : un évènement inattendu dans
+   un état donné renvoie l'état INCHANGÉ. Jamais d'exception, jamais d'état
+   intermédiaire. Rien n'est muté : chaque transition rend un objet neuf.
+
+   État  {phase, mesure0, ancre, gestes, fin, motif}
+   phase presentation → decompte → mesure → bilan | abandon   (les deux
+         derniers sont terminaux, §8.2 point 8)
+
+   OÙ LES ÉVÈNEMENTS `clic` DOIVENT ÊTRE PRIS — §8.2 point 1, et c'est un
+   piège : dans la FILE d'ordonnancement (Moteur.file), jamais à la sortie de
+   Moteur.clic(). À repere:"seuls24" le temps 1 NE SONNE PAS — clic() écarte
+   tout ce qui n'est ni 2 ni 4 avant d'émettre. Brancher le cycle sur les
+   clics audibles ferait que l'ancre ne se poserait JAMAIS sur ces cartes, et
+   sans erreur visible : la carte resterait en décompte indéfiniment. */
+
+const DUREE_MESURE_S = 45;      // §8 — durée de la fenêtre de mesure
+const MESURES_DECOMPTE = 2;     // §8 — mesures consommées avant l'ancre
+const GESTES_MIN = 24;          // §8.1 [P] — seuil UNIQUE : abandon (§8) et
+                                // concluance (§9.1) sont le même nombre.
+
+function cycleInitial(){
+  return {phase:"presentation", mesure0:null, ancre:null, gestes:[], fin:null, motif:null};
+}
+
+function cycleMesure(etat, evt){
+  if(!etat || !evt || typeof evt.type !== "string") return etat;
+  const t = evt.t;
+
+  if(etat.phase === "presentation"){
+    /* §8.2 point 6 — seul `demarrer` agit ici. Fermer la carte avant le
+       départ est de la plomberie, le cycle n'a rien à en dire. */
+    if(evt.type === "demarrer") return cycleDepart();
+    return etat;
+  }
+
+  if(etat.phase === "decompte"){
+    /* §8.2 point 7 — arrêt pendant le décompte : zéro geste, donc abandon,
+       par la règle générale et sans cas particulier. */
+    if(evt.type === "arret") return cycleArret(etat);
+    if(evt.type !== "clic") return etat;
+    if(evt.temps !== 0 || evt.sub !== 0) return etat;        // temps 1 seul
+    if(typeof evt.mesure !== "number") return etat;
+    if(typeof t !== "number" || !isFinite(t)) return etat;
+
+    /* Le Moteur tourne DÉJÀ quand la carte s'ouvre : le premier clic reçu
+       peut tomber au 3ᵉ temps (test 14b). Le décompte part donc du premier
+       temps 1 VU, pas du premier clic reçu. */
+    if(etat.mesure0 === null) return Object.assign({}, etat, {mesure0:evt.mesure});
+
+    /* §8.2 point 2 — `>=` et non `===` : si un temps 1 se perd, l'ancre se
+       pose une mesure trop tard ; avec `===` elle ne se poserait PLUS DU
+       TOUT, et l'attente ne produirait aucune erreur. */
+    if(evt.mesure - etat.mesure0 < MESURES_DECOMPTE) return etat;
+    return Object.assign({}, etat, {phase:"mesure", ancre:t, fin:t + DUREE_MESURE_S});
+  }
+
+  if(etat.phase === "mesure"){
+    if(evt.type === "geste"){
+      if(typeof t !== "number" || !isFinite(t)) return etat;
+      /* §8.1 invariant 2 — rien avant l'ancre, rien après ancre + 45 s. Un
+         geste joué pendant le décompte n'existe pas. Bornes incluses (§8.2
+         point 5). */
+      if(t < etat.ancre || t > etat.fin) return etat;
+      /* §8.2 point 3 — forme `{temps_s}`, celle que stats() attend déjà :
+         pas de couche d'adaptation entre le cycle et la statistique. */
+      const g = {temps_s:t};
+      if(typeof evt.intensite_db === "number") g.intensite_db = evt.intensite_db;
+      return Object.assign({}, etat, {gestes:etat.gestes.concat([g])});
+    }
+    if(evt.type === "horloge"){
+      if(typeof t !== "number" || !isFinite(t)) return etat;
+      if(t - etat.ancre >= DUREE_MESURE_S) return Object.assign({}, etat, {phase:"bilan"});
+      return etat;
+    }
+    if(evt.type === "arret") return cycleArret(etat);
+    return etat;
+  }
+
+  return etat;                  // bilan, abandon — terminaux (§8.2 point 8)
+}
+
+/* Départ de décompte : état neuf, pas l'état de présentation recyclé — une
+   mesure reprise ne doit rien traîner de la précédente. */
+function cycleDepart(){
+  return {phase:"decompte", mesure0:null, ancre:null, gestes:[], fin:null, motif:null};
+}
+
+/* §8.1 — arrêt manuel : bilan si le compte y est, sinon abandon. L'abandon
+   ne produit AUCUNE note et AUCUNE entrée au journal (§8.1 invariant 3) : ce
+   n'est pas une mauvaise note, c'est une mesure qui n'a pas eu lieu. Le motif
+   est écrit, sinon l'écran n'a rien à dire à l'élève. */
+function cycleArret(etat){
+  if(etat.gestes.length >= GESTES_MIN) return Object.assign({}, etat, {phase:"bilan"});
+  return Object.assign({}, etat, {phase:"abandon", motif:"gestes"});
+}
+
 /* §3.0 — regroupement des détections en gestes. Règle RELEVÉE dans le
    source d'analyse-attaque v1.5 (fonction regrouper()), reprise à
    l'identique — une reconstitution qui collait aux données s'est déjà
@@ -1608,7 +1712,7 @@ function stats(gestes, opts){
    tours de phase en 30 s) : le motif utile est « tempo », pas le symptôme. */
 function concluante(st, opts){
   const o = opts||{};
-  if(!(st.n >= 24)) return {ok:false, motif:"gestes"};
+  if(!(st.n >= GESTES_MIN)) return {ok:false, motif:"gestes"};   // §8.1 : seuil unique
   if(o.tempo_regle > 0 && o.tempo_joue > 0 &&
      Math.abs(o.tempo_joue - o.tempo_regle)/o.tempo_regle > 0.03)
     return {ok:false, motif:"tempo"};
