@@ -153,6 +153,24 @@ input[type=range]{width:100%;accent-color:var(--or);height:32px}
 .notes button i{font-style:normal;font-size:.62rem;color:var(--encre-doux)}
 .notes button[data-q="0"]{border-color:var(--brique);color:var(--brique)}
 .notes button[data-q="3"]{border-color:var(--vert);color:var(--vert)}
+.barre{margin-top:13px}
+.barre .piste{position:relative;height:26px;border:1px solid var(--creme3);border-radius:var(--rayon);
+  background:#FFFDF8;overflow:hidden}
+.barre .plage{position:absolute;top:0;bottom:0;border-right:1px solid var(--creme3)}
+.barre .plage:last-child{border-right:0}
+.barre .plage.hachuree{background:repeating-linear-gradient(45deg,rgba(79,107,69,.14) 0 5px,transparent 5px 10px)}
+.barre .habitude{position:absolute;top:0;bottom:0;width:0;border-left:2px dotted var(--sepia)}
+.barre .fantome{position:absolute;top:4px;bottom:4px;width:0;border-left:2px solid var(--encre-doux);opacity:.42}
+.barre .trait{position:absolute;top:0;bottom:0;width:0;border-left:3px solid var(--encre)}
+.barre .legendes{display:flex;font-size:.6rem;color:var(--encre-doux);margin-top:3px}
+.barre .legendes span{text-align:center;line-height:1.25}
+.barre .sens{font-size:.62rem;color:var(--encre-doux);text-align:right;margin-top:2px}
+.barre .chiffres{display:flex;justify-content:space-between;font-size:.7rem;margin-bottom:3px}
+.barre .chiffres b{font-weight:600}
+.barre.pale .piste{opacity:.4}
+.barre .motif{font-size:.72rem;color:var(--brique);margin-top:4px}
+.barre .biais{font-size:.75rem;margin-top:5px}
+.barre .biais.masque{color:var(--encre-doux)}
 .rythme{font-family:var(--serif);font-size:1.6rem;letter-spacing:.2em;line-height:1.6}
 .rappel{background:rgba(63,90,107,.1);border-left:3px solid var(--bleu);padding:8px 10px;margin:9px 0;font-size:.82rem}
 
@@ -1741,13 +1759,23 @@ function concluante(st, opts){
 const NOTES      = ["debuts", "progres", "bien", "acquis"];
 const RHO_ACQUIS = 0.045;
 
-/* §10.2 — rang de ρ. Bornes hautes incluses : 4,5 % est « Acquis »,
-   6,0 % est « Bien ». La table mesure l'écart à l'habitude (6 %), pas une
-   qualité absolue. */
+/* §10.2 — bornes HAUTES de chaque rang, indexées par le rang lui-même.
+   Bornes incluses : 4,5 % est « Acquis », 6,0 % est « Bien ». La table mesure
+   l'écart à l'habitude (6 %), pas une qualité absolue.
+
+   Une SEULE table (§10.4.2 point 1) : rangRho la lit, PLAGES_BARRE la lit.
+   Écrits deux fois, ces trois nombres auraient fini par diverger — la note
+   aurait dit « Bien » et la barre aurait placé le trait dans « En progrès »,
+   sans que rien ne dise laquelle des deux a tort. */
+const RHO_RANGS = [Infinity, 0.080, 0.060, RHO_ACQUIS];
+
+/* §10.4 / §10.7 point 7 — UN seul jeu de libellés, servi aux quatre boutons
+   ET aux quatre plages de la barre. Deux jeux auraient dérivé, et l'élève
+   aurait lu deux mots pour un même rang, à dix centimètres d'écart. */
+const LIBELLES_NOTE = {debuts:"Débuts", progres:"En progrès", bien:"Bien", acquis:"Acquis"};
+
 function rangRho(rho){
-  if(rho <= RHO_ACQUIS) return 3;
-  if(rho <= 0.060)      return 2;
-  if(rho <= 0.080)      return 1;
+  for(let r = 3; r >= 1; r--) if(rho <= RHO_RANGS[r]) return r;
   return 0;
 }
 
@@ -1812,6 +1840,45 @@ function noteProposee(st, ctx){
   }
   return {note:NOTES[rang], plafonnee:plafonnee, discordante:discordante, motif:null};
 }
+
+/* ── §10.4.1 — géométrie de la barre graduée ────────────────────────
+
+   Axe LINÉAIRE en ρ, 12 % à gauche → 3 % à droite : le sens de lecture est
+   celui du progrès, et c'est le MÊME que celui de la numérotation des boutons
+   (§10.7 point 5). Une seule direction à apprendre, pas deux. */
+
+const RHO_BARRE_G = 0.12;       // bord gauche — le plus dispersé
+const RHO_BARRE_D = 0.03;       // bord droit  — le plus régulier
+
+/* Renvoie une fraction de 0 (bord gauche) à 1 (bord droit), bornée.
+
+   null si ρ n'est pas un nombre fini — JAMAIS 0, qui se dessinerait au bord
+   gauche et se lirait « très dispersé » là où il n'y a pas de mesure. C'est le
+   troisième piège de cette famille dans le projet, après l'appariement glouton
+   de la calibration et la subdivision à 2 de pasClic : une absence visible vaut
+   mieux qu'une valeur crédible. */
+function positionBarre(rho){
+  if(typeof rho !== "number" || !isFinite(rho)) return null;
+  const x = (RHO_BARRE_G - rho) / (RHO_BARRE_G - RHO_BARRE_D);
+  return x < 0 ? 0 : (x > 1 ? 1 : x);
+}
+
+/* Les quatre plages, CONSTRUITES depuis RHO_RANGS et LIBELLES_NOTE — aucune
+   position n'est recalculée à la main dans le rendu (§10.4.1). La plage
+   « Acquis » se ferme à 0 et « Débuts » s'ouvre au bord de la barre : les deux
+   extrémités se CALCULENT, positionBarre bornant déjà à [0, 1] (§10.4.2 pt 4).
+     de = côté gauche (ρ le plus haut) · a = côté droit (ρ le plus bas) */
+const PLAGES_BARRE = NOTES.map(function(nom, rang){
+  const haut = Math.min(RHO_RANGS[rang], RHO_BARRE_G);
+  const bas  = rang === NOTES.length - 1 ? 0 : RHO_RANGS[rang + 1];
+  return {note:nom, rang:rang, libelle:(rang + 1) + " " + LIBELLES_NOTE[nom],
+          rho_haut:haut, rho_bas:bas,
+          de:positionBarre(haut), a:positionBarre(bas)};
+});
+
+/* §10.4 — le pointillé « ton habitude » n'est pas un repère ajouté : 6 % est
+   DÉJÀ la frontière En progrès / Bien, donc il se lit dans la même table. */
+const RHO_HABITUDE = RHO_RANGS[2];
 
 /* ── fin des fonctions pures de mesure ──────────────────────────────────── */
 
@@ -2023,6 +2090,129 @@ function rendreCalibration(){
   }
 }
 
+/* ── §2.3 et §10.4 — rendu du bilan de mesure ─────────────────────────
+   La géométrie est pure (§10.4.1, bloc ci-dessus) ; ceci ne fait que la
+   dessiner. Sans appelant tant que 7e n'est pas faite — c'est dit au §14. */
+
+const MOTIF_BIAIS_MASQUE =
+  "Placement non affiché : cet appareil n'est pas calibré. σ, % en cible et la " +
+  "note restent valables — la note ne dépend jamais de la latence.";
+
+/* §2.3 + §10.4.2 point 5 — LE seul endroit où se décide le masquage du biais.
+   Un second test « la calibration existe-t-elle ? » ailleurs dans le rendu
+   finirait par répondre autrement que le premier. Solde le point ouvert j. */
+function biaisAffichable(){
+  const c = calibrationCourante();
+  return c ? {ok:true,  motif:null,               latence_ms:c.latence_ms}
+           : {ok:false, motif:MOTIF_BIAIS_MASQUE, latence_ms:null};
+}
+
+/* Le biais s'AFFICHE, il ne se note pas (§9.3) : la question est posée à
+   l'élève, jamais tranchée par la machine. */
+function rendreBiais(hote, biais_ms){
+  const d = document.createElement("div"); d.className = "biais";
+  const v = biaisAffichable();
+  if(!v.ok || typeof biais_ms !== "number" || !isFinite(biais_ms)){
+    d.className = "biais masque";
+    d.textContent = v.ok ? "Placement non mesurable sur cette prise." : v.motif;
+  }else{
+    const ms = arrondi1(Math.abs(biais_ms));
+    d.textContent = biais_ms >= 0
+      ? "Tu poses " + ms + " ms en arrière du clic — voulu, ou subi ?"
+      : "Tu poses " + ms + " ms en avant du clic — voulu, ou subi ?";
+  }
+  hote.appendChild(d);
+  return d;
+}
+
+/* §10.4 — barre graduée, SOUS les boutons, sans les remplacer : quatre
+   boutons perdent la position DANS le rang, ρ = 5,9 % et ρ = 4,6 % cochent
+   tous deux « Bien » et ne sont pas la même prise.
+     o {rho, sigma_ms, biais_ms, concluante:{ok,motif}, rhoPrecedent, plafonnee}
+   rhoPrecedent : la mesure précédente AU MÊME QUADRUPLET, ou null — absent
+   s'il n'y en a pas, jamais un zéro par défaut. */
+function rendreBarre(hote, o){
+  o = o || {};
+  const conclu = !!(o.concluante && o.concluante.ok);
+  const w = document.createElement("div");
+  w.className = "barre" + (conclu ? "" : " pale");
+
+  /* σ en ms au-dessus (grandeur tangible), ρ en % en dessous (seule grandeur
+     comparable d'un tempo à l'autre) — §10.4. */
+  const ch = document.createElement("div"); ch.className = "chiffres";
+  const g = document.createElement("span"), dr = document.createElement("span");
+  g.innerHTML = conclu && typeof o.sigma_ms === "number" && isFinite(o.sigma_ms)
+    ? "σ <b>" + arrondi1(o.sigma_ms) + " ms</b>" : "σ —";
+  dr.innerHTML = conclu && typeof o.rho === "number" && isFinite(o.rho)
+    ? "ρ <b>" + arrondi1(o.rho * 100) + " %</b>" : "ρ —";
+  ch.appendChild(g); ch.appendChild(dr); w.appendChild(ch);
+
+  const piste = document.createElement("div"); piste.className = "piste";
+  const pct = x => (x * 100).toFixed(2) + "%";
+
+  PLAGES_BARRE.forEach(function(p){
+    const seg = document.createElement("div");
+    seg.className = "plage" + (p.note === "acquis" && o.plafonnee ? " hachuree" : "");
+    seg.style.left = pct(p.de);
+    seg.style.width = pct(p.a - p.de);
+    piste.appendChild(seg);
+  });
+
+  const hab = document.createElement("div"); hab.className = "habitude";
+  hab.style.left = pct(positionBarre(RHO_HABITUDE));
+  hab.title = "ton habitude";
+  piste.appendChild(hab);
+
+  /* Marqueur fantôme et trait plein : seulement si la mesure est concluante
+     (§10.4, dernière ligne) et seulement si positionBarre rend un nombre —
+     elle rend null quand il n'y a pas de mesure, et null ne se dessine pas. */
+  if(conclu){
+    const xf = positionBarre(o.rhoPrecedent);
+    if(xf !== null){
+      const f = document.createElement("div"); f.className = "fantome";
+      f.style.left = pct(xf); f.title = "précédente, même contexte";
+      piste.appendChild(f);
+    }
+    const xt = positionBarre(o.rho);
+    if(xt !== null){
+      const t = document.createElement("div"); t.className = "trait";
+      t.style.left = pct(xt); t.title = "aujourd'hui";
+      piste.appendChild(t);
+    }
+  }
+  w.appendChild(piste);
+
+  /* Contrainte ferme du §10.4 : les quatre plages portent leur libellé
+     ÉCRIT sous la barre — jamais la couleur seule. */
+  const leg = document.createElement("div"); leg.className = "legendes";
+  PLAGES_BARRE.forEach(function(p){
+    const e = document.createElement("span");
+    e.style.width = pct(p.a - p.de);
+    e.textContent = p.libelle;
+    leg.appendChild(e);
+  });
+  w.appendChild(leg);
+
+  const sens = document.createElement("div"); sens.className = "sens";
+  sens.textContent = "plus régulier →";
+  w.appendChild(sens);
+
+  /* §10.5 — une mesure non concluante n'est pas une mauvaise note : elle
+     affiche son motif, ni « Débuts » ni 0. */
+  if(!conclu){
+    const m = document.createElement("div"); m.className = "motif";
+    m.textContent = "Mesure non concluante · " +
+      ((o.concluante && o.concluante.motif) || "non concluante") +
+      " — aucune note proposée, la carte revient à la notation manuelle.";
+    w.appendChild(m);
+  }else{
+    rendreBiais(w, o.biais_ms);
+  }
+
+  hote.appendChild(w);
+  return w;
+}
+
 $("#calibrer").addEventListener("click",()=>Calibration.ouvrir());
 $("#calib-lancer").addEventListener("click",()=>Calibration.lancer());
 $("#calib-fermer").addEventListener("click",()=>Calibration.fermer());
@@ -2182,7 +2372,11 @@ function rendreExercice(c,hote,opts){
   avant.appendChild(bv);
   if(opts.noter){
     const g=document.createElement("div"); g.className="notes";
-    [[0,"Encore"],[1,"Dur"],[2,"Bien"],[3,"Facile"]].forEach(function(x){
+    /* §10.7 point 7 — « Encore · Dur · Bien · Facile » qualifiait LA TENTATIVE ;
+       le §10.2 qualifie LA CARTE. Rang affiché 1–4 devant le libellé, croissant
+       vers la droite comme la barre du §10.4 — le q 0–3 du SM-2 reste interne
+       et n'apparaît nulle part. Libellés pris dans LIBELLES_NOTE, table unique. */
+    NOTES.map((nom,q)=>[q,(q+1)+" "+LIBELLES_NOTE[nom]]).forEach(function(x){
       const b=document.createElement("button"); b.dataset.q=x[0];
       b.innerHTML=echapper(x[1])+"<i>"+apercu(c,x[0])+"</i>";
       b.addEventListener("click",()=>{
