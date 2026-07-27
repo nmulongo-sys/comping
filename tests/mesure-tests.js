@@ -16,13 +16,15 @@ const fs = require("fs");
 const path = require("path");
 
 /* ── contrat d'API attendu ─────────────────────────────────────────────────
-   regrouper(detections, ecartMinMs)
+   regrouper(detections, fusionMs)
        detections : [{temps_s, intensite_db}] triées croissant
        → [{temps_s, detections, etalement_ms, intensite_db}]
+       Le second paramètre est fusion_ms (§3.0), PAS le réfractaire
+       ecart_min_ms — la première rédaction de ce contrat les confondait.
        Règle relevée dans analyse-attaque v1.5, fonction regrouper() :
          · un groupe s'ouvre sur une détection (le « chef ») ;
-         · une détection est absorbée si elle est à ≤ ecartMinMs de la DERNIÈRE
-           du groupe ET à ≤ 2,5 × ecartMinMs du chef ; sinon elle ouvre ;
+         · une détection est absorbée si elle est à ≤ fusionMs de la DERNIÈRE
+           du groupe ET à ≤ 2,5 × fusionMs du chef ; sinon elle ouvre ;
          · temps_s      = celui du chef ;
          · etalement_ms = dernier − premier ;
          · intensite_db = MAXIMUM du groupe, PAS celle du chef.
