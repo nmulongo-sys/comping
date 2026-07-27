@@ -229,9 +229,21 @@ sur un chef, absorbe toute détection à ≤ `fusion` de la **dernière** du gro
 - **`pasGrille(bpm, subdivision)`** — la grille d'évaluation, imposée par la carte. C'est
   contre elle que les phases sont calculées, et elle ne dépend pas de ce qui est entendu :
   couper le clic ne coupe pas la grille.
-- **`pasClic(bpm, echelon, tempsParMesure)`** — ce qui est entendu, imposé par l'échelon
-  de soutien. Renvoie `null` quand il n'y a pas de clic à intervalle constant ; la grille
-  interne continue seule et la mesure reste possible.
+- **`pasClic(bpm, echelon, tempsParMesure, subdivision)`** — ce qui est entendu, imposé
+  par l'échelon de soutien. Renvoie `null` quand il n'y a pas de clic à intervalle
+  constant ; la grille interne continue seule et la mesure reste possible.
+
+La subdivision est **obligatoire à l'échelon 0** — « temps + subdivision » veut dire
+`pas_clic = pas_grille`, et sans elle la fonction ne peut pas répondre : elle renvoie
+`null` plutôt qu'une valeur plausible. À l'échelon 3 (`seuls24`), le pas dépend du nombre
+de temps et non du seul 4/4 : en deçà de quatre temps le temps 4 n'existe pas, il ne reste
+qu'un clic par mesure, et un clic par mesure est régulier.
+
+| Mesure | Clics | `pas_clic` à l'échelon 3 |
+|---|---|---|
+| 2/4, 3/4 | temps 2 | `T × noire` |
+| 4/4 | temps 2 et 4 | `2 × noire` |
+| 5/4, 6/8 | temps 2 et 4 | `null` — intervalles inégaux |
 
 ### Grandeurs (§9.2)
 
@@ -314,6 +326,27 @@ Deux tests n'y figurent pas et le resteront tant qu'il n'y aura pas de banc audi
 navigateur : le worklet sur signal synthétique, et la boucle acoustique de bout en bout.
 
 ## Journal de développement
+
+### 2026-07-28 — `pasClic` : les deux points posés par le code sont arbitrés
+- Deux comportements que le code avait fixés seuls, faute d'arbitrage, et qui se sont
+  révélés **faux tous les deux sur des cartes du corpus existant**. Consignés en
+  `SPEC-MESURE.md` §7.3 avant correction.
+- **Subdivision obligatoire à l'échelon 0.** Le défaut à 2 (croches) donnait un clic en
+  croches contre une grille en triolets pour `ar-triolets` et en doubles pour
+  `ar-doubles` — toutes deux à 60 bpm, donc à l'échelon 0 de départ. `pasClic` renvoie
+  désormais `null` quand la subdivision manque : une absence visible plutôt qu'une réponse
+  plausible et fausse. Le test T3 ne l'avait pas vu parce qu'il est écrit avec `sub = 2`,
+  ce que le défaut satisfaisait exactement ; il passe maintenant la subdivision.
+- **Échelon 3 : le pas dépend du nombre de temps, pas du seul 4/4.** En deçà de quatre
+  temps, le temps 4 n'existe pas et il ne reste qu'un clic par mesure — parfaitement
+  régulier. `scarborough` est en 3/4 et la progression du §7.2 l'y amènera : le métronome
+  y cliquait bel et bien une fois par mesure pendant que `pasClic` répondait qu'il n'y
+  avait pas de clic. Règle retenue : `T ≤ 3` → `T × noire`, `T = 4` → `2 × noire`,
+  `T ≥ 5` → `null`.
+- Deux tests ajoutés (T3d, T3e), écrits avant la correction et rouges jusqu'à elle.
+  Suite de mesure portée à **23/23**.
+- Reste ouvert, et non tranché ici : `seuls24` a-t-il un sens musical en 6/8 ? Ce n'est
+  pas une question de mesure.
 
 ### 2026-07-28 — Moteur de mesure, étape 5 : la note proposée
 - `noteProposee()` écrite, avec `rangRho()`, `rangCible()` et `serieAcquise()` — dernier
