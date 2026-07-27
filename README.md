@@ -6,6 +6,7 @@ révision — en découle.
 
 **En ligne** : https://nmulongo-sys.github.io/comping/
 **Statut** : Passe 2.2 — séance autonome sur un seul écran, piste médiator, chapitres, récursivité. Fichier HTML unique, aucune dépendance, fonctionne hors ligne.
+**En chantier** : moteur de mesure du jeu (calibration de latence, détection d'attaques, note proposée). Spécifié dans `SPEC-MESURE.md`, étapes 1 à 5 livrées, pas encore branché dans l'interface.
 
 ## Utilisation
 
@@ -26,7 +27,9 @@ Cinq onglets :
 - **Cartes** — file de révision espacée. **Chaque exercice embarque son propre
   métronome**, déjà réglé (mesure, subdivision, swing, accents, trous, rampe) ; le
   tempo de travail est mémorisé par carte.
-- **Journal** — historique, série de jours consécutifs, état de l'entretien, export JSON.
+- **Journal** — historique, série de jours consécutifs, état de l'entretien, export JSON,
+  et **calibration de latence** de l'appareil (« Calibrer cet appareil »). Calibrer est une
+  opération unique par appareil, d'où l'absence de sixième onglet.
 
 ## Architecture & conventions
 
@@ -43,7 +46,8 @@ consigne, critère, prérequis, préréglages) et la sauvegarde sur la **progres
 pas l'historique.
 
 ```
-{ version, dureeSeance, metro{…}, cartes[…], journal[…], introJour{date,n} }
+{ version, dureeSeance, metro{…}, cartes[…], journal[…], introJour{date,n},
+  calibration{ <empreinte>: {latence_ms, dispersion_ms, n, date, sr} } }
 ```
 
 **Carte** : `{ id, chapitre, type, main, titre, consigne, critere, rythme, preset,
@@ -167,7 +171,198 @@ chargées depuis Google Fonts avec repli système — l'app reste fonctionnelle 
 seule la typographie dégrade. Mobile d'abord : onglets bas fixes, cibles tactiles ≥ 44 px,
 `prefers-reduced-motion` respecté, focus clavier visible.
 
+## Moteur de mesure (en chantier)
+
+`comping` mesure le jeu et **propose** une note ; il ne la décide pas. Cette phrase
+gouverne tout le reste du moteur.
+
+**`SPEC-MESURE.md` est le document qui fait autorité** (v0.8). Le code ne le précède
+jamais : spec d'abord, tests ensuite, code en dernier. Un test rouge tant que la fonction
+n'existe pas n'est pas une panne — c'est l'ordre de marche.
+
+### Calibration de latence (§2)
+
+Boucle acoustique : l'app émet 24 clics par le haut-parleur et les réentend par le micro.
+Le clic de calibration est le clic de travail **non accentué** (900 Hz, gain 0,18, carrée,
+décroissance 55 ms), synthétisé par `emettreClic()` partagée avec le métronome — l'accent
+de premier temps est une autre attaque, donc une autre latence.
+
+**Appariement par consensus** (`apparier`, §2.5), imposé par le terrain : la règle
+naïve — première détection de la fenêtre — visait la résonance, qui *suit* l'attaque, et
+n'a aucune défense contre un bruit ambiant qui la *précède*. Six refus d'affilée le
+2026-07-27, 136 détections brutes pour 24 clics, alors que la boucle donnait 200 ms à
+±3 ms. Le retard retenu est désormais celui sur lequel les clics **s'accordent** : support
+maximal à ±10 ms, puis chaque clic prend sa détection la plus proche du consensus à ±20 ms.
+
+**Verdict** (`verdictCalibration`) : rejet en deçà de 20 clics entendus ou au-delà de 15 ms
+d'écart interquartile — l'interquartile, pas l'écart-type, parce qu'il résiste aux clics
+manqués ou doublés. Rien n'est enregistré en cas de rejet : une calibration douteuse est
+pire que pas de calibration, elle déplacerait le biais affiché sans le dire.
+
+Le registre est **indexé par appareil** (`empreinteAppareil()`, hachage djb2 grossier sur
+agent + fréquence + latence déclarée) : il évite de réutiliser la latence d'un autre
+téléphone, il n'identifie pas une machine.
+
+Sans calibration l'app **fonctionne** : σ, ρ, % en cible, accroche et note restent
+disponibles. Seule la lecture du placement en avant / en arrière est masquée, faute de
+pouvoir distinguer le jeu du matériel.
+
+### Chaîne de détection (§3)
+
+Le détecteur est un `AudioWorkletProcessor` **embarqué verbatim** depuis
+`analyse-attaque` v1.5, dans `#src-detecteur` : aucune ligne n'en a été retouchée, et un
+test le vérifie. Trois constantes, non exposées à l'utilisateur :
+
+| Constante | Valeur | Rôle |
+|---|---|---|
+| `SENS_DETECTION` | 2,5 | seuil de déclenchement. Suffisant pour des clics isolés (24/24 à la calibration), **trop haut pour le jeu rapide et nuancé** — point ouvert. |
+| `ECART_MIN_MS` | 55 | temps réfractaire **du détecteur**. |
+| `FUSION_MS` | 120 | regroupement des détections en **gestes**, après coup. |
+
+Les deux derniers se confondent facilement ; ils ne mesurent pas la même chose.
+`regrouper()` est **porté à l'identique** depuis v1.5, pas reconstruit : un groupe s'ouvre
+sur un chef, absorbe toute détection à ≤ `fusion` de la **dernière** du groupe et à
+≤ 2,5 × `fusion` du chef, porte le temps du chef et l'intensité **maximale** du groupe.
+
+### Deux pas, jamais le même (§4.1)
+
+- **`pasGrille(bpm, subdivision)`** — la grille d'évaluation, imposée par la carte. C'est
+  contre elle que les phases sont calculées, et elle ne dépend pas de ce qui est entendu :
+  couper le clic ne coupe pas la grille.
+- **`pasClic(bpm, echelon, tempsParMesure)`** — ce qui est entendu, imposé par l'échelon
+  de soutien. Renvoie `null` quand il n'y a pas de clic à intervalle constant ; la grille
+  interne continue seule et la mesure reste possible.
+
+### Grandeurs (§9.2)
+
+Statistique circulaire sur les phases : **R** (accroche), **Rayleigh** (p-valeur),
+**biais** (angle moyen), **σ_grille**. Deux ajouts propres à `comping` :
+
+- **σ_locale** — écart-type d'**échantillon** (n−1) des intervalles entre gestes
+  successifs. Immune à la dérive, c'est elle qui nourrit la note. v1.5 ne la calculait
+  pas : son « Régularité (σ) » affichait σ_grille.
+- **ρ = σ_locale / pas_grille** — la seule grandeur comparable d'un tempo à l'autre.
+  Référence mesurée : **ρ ≈ 6 %, stable de 333 à 1000 ms**.
+
+Le **% en cible** est calculé par différence **circulaire** autour du biais : sans repli,
+les gestes qui enjambent ±pas/2 étaient perdus (observé à 215 ms de biais pour 166 ms de
+demi-pas).
+
+Le biais **s'affiche, il ne se note pas**. Il ouvre une question posée à l'élève —
+« tu poses en arrière — voulu ou subi ? » — jamais tranchée par la machine.
+
+### Concluance et note (§9.1, §10)
+
+Une mesure est *concluante* si elle passe quatre garde-fous, **dans cet ordre** : ≥ 24
+gestes, tempo joué à ≤ 3 % du tempo réglé, Rayleigh p < 0,001, accroche R > 0,25. Le tempo
+**avant** Rayleigh : une dérive de 5 % couche R mécaniquement, et le motif utile est la
+cause, pas le symptôme.
+
+La note ne connaît que **deux entrées** : ρ et % en cible. Ni le biais, ni la dynamique, ni
+la latence — jamais, même calibrée.
+
+| ρ | % en cible attendu | Note pré-cochée |
+|---|---|---|
+| ≤ 4,5 % | ≳ 80 % | **Acquis**, sous réserve du plafond |
+| 4,5 – 6,0 % | 68 – 80 % | **Bien** ← jeu de référence |
+| 6,0 – 8,0 % | 55 – 68 % | **En progrès** |
+| > 8,0 % | ≲ 55 % | **Débuts** |
+
+La table est ancrée sur ρ ≈ 6 % = « Bien » : elle mesure l'**écart à l'habitude**, pas une
+qualité absolue. Le % en cible n'est qu'un contrôle de cohérence — au-delà d'un rang
+d'écart, l'app propose la plus basse des deux et affiche « lecture discordante ».
+
+Deux règles de sûreté encadrent la table :
+
+- **Jamais « Acquis » sur une prise isolée.** Les quatre libellés qualifient une *carte*,
+  pas une *tentative* ; l'acquis est une propriété d'un historique. La proposition
+  plafonne à « Bien » tant que les trois dernières mesures au même quadruplet ne sont pas
+  toutes concluantes et à ρ ≤ 4,5 %. `serieAcquise()` est **le** compteur : la montée
+  d'échelon le lit au même endroit, il n'y en a pas deux à synchroniser.
+- **Une mesure non concluante ne retombe jamais sur « Débuts ».** « Débuts » est une note,
+  pas un constat d'échec de mesure : elle ne pré-coche rien et expose son motif de rejet.
+  Sinon un micro qui décroche devient une punition, et l'historique enregistre un échec
+  qui n'a pas eu lieu.
+
+### Bloc de fonctions pures, et son extraction
+
+Les fonctions du moteur vivent dans `index.html`, entre les marqueurs
+`/* ── fonctions pures de mesure, testables sous Node ─` et
+`/* ── fin des fonctions pures de mesure ─`. Elles ne sont **jamais recopiées** ailleurs :
+`tests/mesure-pur.js` les **extrait** du HTML à l'exécution et les exporte en CommonJS.
+Une copie dériverait en silence ; un extrait ne le peut pas.
+
+Conséquence contraignante : **aucune référence au DOM, à `window`, à `ctx` ni à l'état `S`
+ne doit entrer dans ce bloc**, sinon l'extraction casse. Toute fonction ajoutée au bloc
+doit l'être aussi à la liste `EXPORTES` de `tests/mesure-pur.js` — c'est la seule
+frontière.
+
+### Tests
+
+```
+node tests/mesure-tests.js        # 21 tests — moteur de mesure
+node tests/calibration-tests.js   # 23 tests — calibration
+```
+
+Aucune dépendance : ni npm, ni navigateur, ni `AudioContext`. Les deux suites lisent
+`index.html` directement. `tests/fixtures/` porte des captures réelles — séance libre
+(82 détections / 52 gestes), protocole complet (14 prises, 1913 détections), session de
+calibration refusée — qui servent de références reproductibles : `regrouper` est vérifié
+contre la sortie réelle de v1.5, pas contre une reconstitution.
+
+Deux tests n'y figurent pas et le resteront tant qu'il n'y aura pas de banc audio hors
+navigateur : le worklet sur signal synthétique, et la boucle acoustique de bout en bout.
+
 ## Journal de développement
+
+### 2026-07-28 — Moteur de mesure, étape 5 : la note proposée
+- `noteProposee()` écrite, avec `rangRho()`, `rangCible()` et `serieAcquise()` — dernier
+  morceau de fonction pure avant le branchement dans l'interface. Les six tests en attente
+  passent : la suite de mesure est à **21/21**, la calibration reste à **23/23**.
+- `serieAcquise(historique, quadruplet)` est le compteur **unique** du plafond « Acquis »
+  et de la montée d'échelon : une seule lecture, appelée au même endroit par les deux
+  règles, plutôt que deux comptages à tenir synchronisés.
+- Quatre décisions d'implémentation consignées en `SPEC-MESURE.md` §10.7 plutôt que
+  laissées dans le code : bornes de la colonne « % en cible » (80 / 68 / 55, bornes basses
+  incluses, marquées provisoires), ordre des trois règles, échec fermé sur la concluance,
+  lecture de l'historique.
+- **Échec fermé** : sans `{ok:true}` explicite, aucune note n'est proposée. La règle « une
+  mesure non concluante ne pré-coche rien » est une règle de sûreté — elle ne doit pas
+  dépendre de la discipline de l'appelant.
+- Conséquence non fortuite de l'ordre retenu : une lecture discordante ne peut jamais
+  retenir « Acquis », puisqu'elle prend déjà la plus basse des deux lectures.
+- `index.html` modifié de façon **purement additive** : 92 lignes ajoutées, 0 supprimée.
+  Worklet intact.
+
+### 2026-07-27 — Moteur de mesure, étapes 1 à 4 : calibration, détection, statistique
+- **Spécification d'abord.** `SPEC-MESURE.md` rédigé et validé avant toute ligne de code,
+  puis porté de v0.1 à v0.7.1 au fil des arbitrages. Les tests sont écrits avant le code
+  et restent rouges jusqu'à ce qu'il existe.
+- **Calibration de latence livrée** : boucle acoustique de 24 clics, appariement,
+  verdict, registre indexé par appareil, migration `comping_v2.1 → v2.2`. Entrée dans le
+  Journal, pas de sixième onglet.
+- **Première calibration de terrain, et son enseignement.** Six refus d'affilée
+  (dispersions de 88,7 à 193,8 ms) attribués à tort à l'appareil : sous le bruit, la
+  boucle était saine — 21 clics à +197…+203 ms. Le coupable était l'**appariement
+  glouton**, qui prenait la première détection de la fenêtre, presque toujours un bruit
+  antérieur à l'arrivée du clic. Remplacé par l'appariement par consensus (§2.5),
+  réfractaire abaissé à 30 ms pendant la calibration seule. Résultat sur l'appareil de
+  référence : **200 ms, dispersion 3 ms, 24 clics sur 24**, enregistré.
+- **Worklet importé verbatim** depuis `analyse-attaque` v1.5, vérifié par `diff` et par un
+  test dédié. `regrouper()` porté à l'identique et vérifié contre la sortie réelle de
+  v1.5 : 82 détections → les 52 gestes, exacts. Une reconstitution qui collait aux données
+  s'était déjà révélée fausse.
+- **Statistique circulaire portée**, plus deux ajouts propres à `comping` : σ_locale
+  (écart-type d'échantillon des intervalles successifs) et le % en cible en différence
+  circulaire — v1.5 comparait sans repli et perdait les gestes enjambant ±pas/2.
+- **Ordre des motifs de rejet fixé** : gestes, tempo, Rayleigh, accroche. Le tempo avant
+  Rayleigh, parce qu'une dérive couche R mécaniquement et que le motif utile est la cause.
+- **Deux points instruits et laissés ouverts, plutôt que masqués** : `fusion_ms = 120`
+  n'est pas justifiable par le comptage (les erreurs sont de signes opposés — sur-détection
+  par résonance d'un côté, sous-détection de l'autre, que nul regroupement ne corrige), et
+  la sensibilité de 2,5 est trop haute pour le jeu rapide et nuancé.
+- Fixtures versionnées (séance libre, protocole complet, session de calibration refusée)
+  pour que les tests s'appuient sur des références reproductibles.
 
 ### 2026-07-26 — Passe 2.2 : la séance devient autonome sur un seul écran
 - **Défaut de conception corrigé.** Le déroulé de séance n'affichait qu'un nom de bloc,
