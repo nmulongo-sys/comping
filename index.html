@@ -403,7 +403,13 @@ input[type=range]{width:100%;accent-color:var(--or);height:32px}
     <p id="calib-compte">0</p>
     <p class="pas"><small>clics émis sur 24</small></p>
   </div>
-  <div id="calib-fin" hidden><p id="calib-verdict"></p></div>
+  <div id="calib-fin" hidden><p id="calib-verdict"></p>
+    <details id="calib-detail" hidden>
+      <summary>Détail de la mesure</summary>
+      <pre id="calib-detail-texte"></pre>
+      <button class="b creux" id="calib-copier">Copier le détail</button>
+    </details>
+  </div>
   <div class="ligne-b" style="margin-top:19px">
     <button class="b" id="calib-lancer">Commencer</button>
     <button class="b creux" id="calib-fermer">Fermer</button>
@@ -1406,7 +1412,7 @@ const Detecteur = {
 
 const Calibration = {
   N_CLICS:24, INTERVALLE:1.0, AMORCE:1.2, QUEUE:1.0,
-  en_cours:false, programmes:[], suivi:null, fin:null,
+  en_cours:false, programmes:[], suivi:null, fin:null, detail:null,
 
   ouvrir(){
     this.reinitialiser();
@@ -1424,6 +1430,7 @@ const Calibration = {
     $("#calib-consigne").hidden=false;
     $("#calib-mesure").hidden=true;
     $("#calib-fin").hidden=true;
+    $("#calib-detail").hidden=true;
     $("#calib-lancer").hidden=false;
     $("#calib-lancer").textContent="Commencer";
     $("#calib-jauge").firstElementChild.style.width="0";
@@ -1478,6 +1485,7 @@ const Calibration = {
 
     const paires=apparier(this.programmes,detections);
     const v=verdictCalibration(paires.map(p=>p.delta_ms));
+    this.detailler(detections,paires);
     if(!v.ok){ this.afficherRejet(v.texte); return; }
 
     S.calibration[empreinteAppareil()]={
@@ -1496,6 +1504,43 @@ const Calibration = {
       "Cette valeur ne vaut que pour cet appareil.</small>";
     $("#calib-lancer").hidden=false;
     $("#calib-lancer").textContent="Recommencer";
+  },
+
+  /* Point ouvert h : tant qu'aucune calibration ne passe, le verdict seul ne
+     dit pas POURQUOI. Ce relevé expose les retards un par un et le nombre de
+     détections brutes — un excès de détections désigne la résonance, un
+     éparpillement uniforme désigne autre chose. Aucune valeur n'est
+     enregistrée pour autant : le §2.1 point 5 reste tenu. */
+  detailler(detections,paires){
+    const t0=this.programmes[0];
+    const dl=paires.map(p=>Math.round(p.delta_ms));
+    const brut=detections.map(t=>Math.round((t-t0)*1000));
+    const med=mediane(dl), iqr=interquartile(dl);
+    this.detail=[
+      "clics programmés : "+this.N_CLICS+" à "+Math.round(this.INTERVALLE*1000)+" ms",
+      "détections brutes : "+detections.length,
+      "clics appariés : "+paires.length,
+      "médiane "+(med===null?"—":arrondi1(med))+" ms · interquartile "+
+        (iqr===null?"—":arrondi1(iqr))+" ms",
+      "",
+      "retards appariés (ms) :",
+      dl.join(" "),
+      "",
+      "détections brutes, depuis le 1er clic (ms) :",
+      brut.join(" ")
+    ].join("\n");
+    const pre=$("#calib-detail-texte"), d=$("#calib-detail");
+    if(pre) pre.textContent=this.detail;
+    if(d) d.hidden=false;
+  },
+
+  copierDetail(){
+    const b=$("#calib-copier");
+    if(!this.detail||!b) return;
+    const fini=t=>{ b.textContent=t; setTimeout(()=>b.textContent="Copier le détail",2000); };
+    try{
+      navigator.clipboard.writeText(this.detail).then(()=>fini("Copié"),()=>fini("Sélectionne le texte"));
+    }catch(e){ fini("Sélectionne le texte"); }
   },
 
   afficherRejet(texte){
@@ -1529,6 +1574,7 @@ function rendreCalibration(){
 $("#calibrer").addEventListener("click",()=>Calibration.ouvrir());
 $("#calib-lancer").addEventListener("click",()=>Calibration.lancer());
 $("#calib-fermer").addEventListener("click",()=>Calibration.fermer());
+$("#calib-copier").addEventListener("click",()=>Calibration.copierDetail());
 $("#calib-oublier").addEventListener("click",()=>{
   delete S.calibration[empreinteAppareil()];
   sauver(); rendreCalibration();
