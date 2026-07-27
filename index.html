@@ -1496,6 +1496,98 @@ function concluante(st, opts){
   return {ok:true, motif:null};
 }
 
+/* §10 — note proposée. Deux entrées et deux seulement (§10.1) : ρ et
+   % en cible. Ni le biais, ni la dynamique, ni le nombre de gestes au-delà
+   du seuil de validité — et jamais la latence, même calibrée (§9.3).
+
+   Trois règles se superposent, dans cet ordre (§10.7 point 2) :
+   · §10.5 — une mesure non concluante ne pré-coche RIEN. Elle ne retombe
+     jamais sur « Débuts », qui est une note et non un constat d'échec de
+     mesure : sinon un micro qui décroche devient une punition.
+   · §10.2 — table ancrée sur ρ ≈ 6 % = « Bien ». Le % en cible est un
+     contrôle de cohérence, pas un second critère : tant que les deux
+     colonnes ne s'écartent pas de plus d'un rang, ρ décide seul. Au-delà,
+     la plus basse des deux est proposée et la discordance se dit.
+   · §10.3 — jamais « Acquis » sur une prise isolée. L'acquis est une
+     propriété d'un historique, pas d'une tentative de 45 s.
+
+   La mesure propose, Jean valide : la note renvoyée est pré-cochée et
+   modifiable, l'app ne l'applique pas seule. */
+const NOTES      = ["debuts", "progres", "bien", "acquis"];
+const RHO_ACQUIS = 0.045;
+
+/* §10.2 — rang de ρ. Bornes hautes incluses : 4,5 % est « Acquis »,
+   6,0 % est « Bien ». La table mesure l'écart à l'habitude (6 %), pas une
+   qualité absolue. */
+function rangRho(rho){
+  if(rho <= RHO_ACQUIS) return 3;
+  if(rho <= 0.060)      return 2;
+  if(rho <= 0.080)      return 1;
+  return 0;
+}
+
+/* §10.2 / §10.7 point 1 — rang du % en cible. La spec donne la colonne en
+   approximatif (≳ 80, ≈ 68–80, ≈ 55–68, ≲ 55) parce qu'elle décrit une
+   attente ; le code doit trancher : 80, 68, 55, bornes basses incluses.
+   [P] tant que le point ouvert i n'est pas soldé. */
+function rangCible(pct){
+  if(pct >= 80) return 3;
+  if(pct >= 68) return 2;
+  if(pct >= 55) return 1;
+  return 0;
+}
+
+/* §10.3 et §7.2 — LE compteur, un seul pour les deux règles : le plafond
+   sur « Acquis » et la montée d'échelon lisent la même chose au même
+   endroit, il n'y a pas deux comptages à tenir synchronisés.
+
+   historique : mesures ANTÉRIEURES, la plus récente en dernier ; la mesure
+   du jour n'y figure pas. La série n'est acquise que si les trois dernières
+   entrées sont toutes concluantes, toutes au quadruplet courant et toutes à
+   ρ ≤ 4,5 %. Moins de trois, ou une seule qui rompt : c'est non. */
+function serieAcquise(historique, quadruplet){
+  const h = historique || [];
+  if(h.length < 3 || !quadruplet) return false;
+  for(let i = h.length - 3; i < h.length; i++){
+    const m = h[i];
+    if(!m || m.concluante !== true) return false;
+    if(!memeQuadruplet(m.quadruplet, quadruplet)) return false;
+    if(!(m.rho <= RHO_ACQUIS)) return false;
+  }
+  return true;
+}
+
+/* ctx : {concluante, quadruplet, historique}
+   → {note, plafonnee, discordante, motif}, note ∈ NOTES ou null.
+
+   Échec fermé (§10.7 point 3) : sans {ok:true} explicite, aucune note. Le
+   §10.5 est une règle de sûreté, elle ne peut pas dépendre de la discipline
+   de l'appelant. `motif` ne porte que le motif de rejet du §9.1 — il reste
+   null dès que la mesure est concluante, quel que soit le plafond. */
+function noteProposee(st, ctx){
+  const o = ctx || {};
+  const c = o.concluante;
+  if(!c || c.ok !== true)
+    return {note:null, plafonnee:false, discordante:false,
+            motif:(c && c.motif) || "non concluante"};
+  if(!st || typeof st.rho !== "number" || !isFinite(st.rho) ||
+     typeof st.pct_cible !== "number" || !isFinite(st.pct_cible))
+    return {note:null, plafonnee:false, discordante:false, motif:"grandeurs"};
+
+  const rR = rangRho(st.rho), rC = rangCible(st.pct_cible);
+  const discordante = Math.abs(rR - rC) > 1;
+  let rang = discordante ? Math.min(rR, rC) : rR;
+
+  /* §10.3 — le plafond n'a d'effet que sur « Acquis », donc jamais sur une
+     lecture discordante, qui retient déjà la plus basse des deux. */
+  let plafonnee = false;
+  if(rang === 3 && !serieAcquise(o.historique, o.quadruplet)){
+    rang = 2;
+    plafonnee = true;
+  }
+  return {note:NOTES[rang], plafonnee:plafonnee, discordante:discordante, motif:null};
+}
+
 /* ── fin des fonctions pures de mesure ──────────────────────────────────── */
 
 /* ── micro + worklet ────────────────────────────────────────────────────── */
