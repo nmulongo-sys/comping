@@ -828,7 +828,14 @@ que le motif de rejet du §9.1, jamais une explication de la note.
 
 ---
 
-## 11. Stockage — `comping_v3`
+## 11. Stockage — clé `comping_v2`, schéma v3
+
+> **La clé de `localStorage` reste `comping_v2`. Seul le champ `version` passe à 3.**
+> Le titre « `comping_v3` » de la v0.10 était un piège : renommer la clé viderait la
+> progression enregistrée de Jean — cartes, journal, calibration — sans le moindre
+> message. Une session qui appliquerait la spec à la lettre aurait effacé des mois de
+> travail. Corrigé le 2026-07-28, avant l'écriture de 7a.
+
 
 **Rien de ce qui suit n'existe encore dans `index.html`** : `etatNeuf()` s'arrête à
 `calibration:{}`. C'est le premier morceau de l'étape 7, et ce n'est pas un hasard —
