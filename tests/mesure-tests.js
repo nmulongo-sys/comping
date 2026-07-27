@@ -1,7 +1,8 @@
 "use strict";
 /* ═══════════════════════════════════════════════════════════════════════════
    comping — tests d'acceptation des fonctions pures du moteur de mesure
-   SPEC-MESURE.md v0.3 · §13 tests 2 (partiel), 3, 4, 5, 8 + §10.3 et §10.5
+   SPEC-MESURE.md v0.10 · §13 tests 2 (partiel), 3, 4, 5, 8, 10 à 19
+   + §10.2, §10.3, §10.5, §7.1
 
    Écrits AVANT le code, conformément au §13. Ils ne dépendent ni du worklet,
    ni du navigateur, ni d'un AudioContext.
@@ -44,6 +45,33 @@ const path = require("path");
        note ∈ "debuts" | "progres" | "bien" | "acquis" | null
    echelonDepart(bpm)                 → 0 | 1
    memeQuadruplet(a, b)               → bool
+       §6.2 depuis la spec v0.10 : le tempo est comparé au PALIER de 4 bpm,
+       plus à l'unité. Les trois autres termes restent comparés à l'identique.
+
+   ── étape 7 du §14, spécifiées et pas encore écrites ────────────────────
+   quadrupletDe(carte)                → {tempo, subdivision, repere, soutien} | null
+       §6.1. tempo = carte.bpmTravail (jamais bpmCible) ; subdivision = table
+       inverse de SUBDIVISIONS sur carte.preset.sub ; repere = carte.preset.repere
+       tel quel ; soutien = echelonDe(carte.preset). null dès qu'un terme
+       manque — jamais de quadruplet partiel.
+   palierTempo(bpm)                   → Math.round(bpm/4)*4          §6.2
+   echelonDe(preset)                  → 0..5                        §7.4
+       Ordre NON commutatif : muet → 5, gap → 4, seuls24 → 3, accent24 → 2,
+       sub > 1 → 0, sinon 1. Le repère se lit AVANT la subdivision.
+   cycleInitial()                     → {phase:"presentation", …}   §8.1
+   cycleMesure(etat, evt)             → etat'                       §8.1
+       phase ∈ presentation | decompte | mesure | bilan | abandon
+       etat  {phase, mesure0, ancre, gestes, fin, motif}
+       evt   {type:"demarrer"}
+             {type:"clic", mesure, temps, sub, t}
+             {type:"geste", t}
+             {type:"horloge", t}
+             {type:"arret"}
+       Transition TOTALE : un évènement inattendu renvoie l'état inchangé.
+   positionBarre(rho)                 → [0,1] | null                §10.4.1
+       (0,12 − ρ) / (0,12 − 0,03), bornée. null si ρ n'est pas fini —
+       jamais 0, qui se lirait « très dispersé » là où il n'y a pas de mesure.
+   DUREE_MESURE_S 45 · MESURES_DECOMPTE 2 · GESTES_MIN 24
    ────────────────────────────────────────────────────────────────────────── */
 
 const CHEMIN_MODULE = path.join(__dirname, "mesure-pur.js");
@@ -62,6 +90,14 @@ function test(nom, fn) {
   catch (e) { echecs++; ligne.push("  ÉCHEC " + nom + "\n         " + e.message); }
 }
 function vrai(cond, msg) { if (!cond) throw new Error(msg || "attendu vrai"); }
+/* Rouge POUR LA BONNE RAISON (§13) : tant qu'une fonction de l'étape 7 n'est
+   pas écrite dans le bloc d'index.html, le test qui la vise échoue en la
+   nommant, au lieu de faire tomber la suite entière avant le premier test. */
+function exige(nom) {
+  if (M[nom] === undefined)
+    throw new Error(nom + " absente du bloc pur — §14 étape 7, pas encore écrite.");
+  return M[nom];
+}
 function egal(a, b, msg) {
   if (a !== b) throw new Error((msg || "") + " attendu " + JSON.stringify(b) + ", obtenu " + JSON.stringify(a));
 }
@@ -263,30 +299,30 @@ test("T5d · §10.5 — une mesure non concluante ne retombe jamais sur « Débu
    distinctes, jamais moyennées.                                            */
 const Q = (t, s, r, so) => ({ tempo: t, subdivision: s, repere: r, soutien: so });
 test("T8 · deux quadruplets différents ne sont jamais fusionnés", () => {
-  const a = Q(88, "croches", "temps", 1), b = Q(88, "croches", "temps", 2);
+  const a = Q(88, "croches", "accent24", 1), b = Q(88, "croches", "accent24", 2);
   egal(M.memeQuadruplet(a, a), true, "identité :");
   egal(M.memeQuadruplet(a, b), false, "le soutien seul suffit à séparer :");
-  egal(M.memeQuadruplet(a, Q(92, "croches", "temps", 1)), false, "tempo :");
-  egal(M.memeQuadruplet(a, Q(88, "noires", "temps", 1)), false, "subdivision :");
-  egal(M.memeQuadruplet(a, Q(88, "croches", "2et4", 1)), false, "repère :");
+  egal(M.memeQuadruplet(a, Q(92, "croches", "accent24", 1)), false, "tempo :");
+  egal(M.memeQuadruplet(a, Q(88, "noires", "accent24", 1)), false, "subdivision :");
+  egal(M.memeQuadruplet(a, Q(88, "croches", "seuls24", 1)), false, "repère :");
 });
 test("T8b · §10.3 — trois mesures à ρ ≤ 4,5 % au MÊME quadruplet lèvent le plafond", () => {
   const st = { n: 60, R: 0.8, p: 1e-9, rho: 0.03, pct_cible: 85, sigma_locale_ms: 10 };
-  const ok = { ok: true, motif: null }, q = Q(88, "croches", "temps", 1);
+  const ok = { ok: true, motif: null }, q = Q(88, "croches", "accent24", 1);
   const trois = [
     { quadruplet: q, rho: 0.04, concluante: true },
     { quadruplet: q, rho: 0.03, concluante: true },
     { quadruplet: q, rho: 0.042, concluante: true }
   ];
   egal(M.noteProposee(st, { concluante: ok, quadruplet: q, historique: trois }).note, "acquis");
-  const casse = [trois[0], { quadruplet: Q(88, "croches", "temps", 2), rho: 0.03, concluante: true }, trois[2]];
+  const casse = [trois[0], { quadruplet: Q(88, "croches", "accent24", 2), rho: 0.03, concluante: true }, trois[2]];
   const r = M.noteProposee(st, { concluante: ok, quadruplet: q, historique: casse });
   egal(r.note, "bien", "quadruplet rompu → plafond maintenu :");
   egal(r.plafonnee, true);
 });
 test("T8c · prise isolée excellente → plafonnée à « Bien » (§10.3)", () => {
   const st = { n: 60, R: 0.85, p: 1e-9, rho: 0.028, pct_cible: 88, sigma_locale_ms: 9 };
-  const r = M.noteProposee(st, { concluante: { ok: true }, quadruplet: Q(88, "croches", "temps", 1), historique: [] });
+  const r = M.noteProposee(st, { concluante: { ok: true }, quadruplet: Q(88, "croches", "accent24", 1), historique: [] });
   egal(r.note, "bien", "jamais « Acquis » sur une prise isolée :");
   egal(r.plafonnee, true);
 });
@@ -294,7 +330,7 @@ test("T8c · prise isolée excellente → plafonnée à « Bien » (§10.3)", ()
 /* ═══ Table de notation §10.2 — bornes ══════════════════════════════════════ */
 test("§10.2 · bornes de la table de correspondance", () => {
   const base = { n: 60, R: 0.8, p: 1e-9, sigma_locale_ms: 20 };
-  const q = Q(88, "croches", "temps", 1), c = { ok: true };
+  const q = Q(88, "croches", "accent24", 1), c = { ok: true };
   const note = (rho, pct) => M.noteProposee(Object.assign({}, base, { rho: rho, pct_cible: pct }),
     { concluante: c, quadruplet: q, historique: [] }).note;
   egal(note(0.05, 74), "bien", "ρ = 5 % (jeu de référence) :");
@@ -304,7 +340,7 @@ test("§10.2 · bornes de la table de correspondance", () => {
 });
 test("§10.2b · lecture discordante : la plus basse des deux, et elle se dit", () => {
   const st = { n: 60, R: 0.8, p: 1e-9, rho: 0.03, pct_cible: 45, sigma_locale_ms: 10 };
-  const r = M.noteProposee(st, { concluante: { ok: true }, quadruplet: Q(88, "croches", "temps", 1), historique: [] });
+  const r = M.noteProposee(st, { concluante: { ok: true }, quadruplet: Q(88, "croches", "accent24", 1), historique: [] });
   egal(r.discordante, true, "discordance signalée :");
   egal(r.note, "debuts", "la plus basse des deux lectures :");
 });
@@ -318,7 +354,173 @@ test("§7.1 · échelon de départ selon le tempo (seuils 76 et 132 bpm, proviso
   egal(M.echelonDepart(150), 1, "> 132 bpm :");
 });
 
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   ÉTAPE 7 — tests 10 à 19, écrits avant le code (§13, §14 étape 7)
+   Rouges tant que le bloc pur ne contient pas les fonctions ; verts d'eux-
+   mêmes ensuite. Aucun ne touche le DOM.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* ═══ 7b · dérivation — §6.1, §6.2, §7.4 ════════════════════════════════════ */
+
+test("18 · echelonDe — les six lignes du tableau du §7.4, dans l'ordre", () => {
+  const f = exige("echelonDe");
+  egal(f({ sub: 1, repere: "tous", muet: true }), 5, "muet l'emporte sur tout :");
+  egal(f({ sub: 1, repere: "tous", gap: true }), 4, "gap avant le repère :");
+  egal(f({ sub: 1, repere: "seuls24" }), 3, "seuls24 :");
+  egal(f({ sub: 1, repere: "accent24" }), 2, "accent24 :");
+  egal(f({ sub: 2, repere: "tous" }), 0, "subdivision audible :");
+  egal(f({ sub: 1, repere: "tous" }), 1, "temps seuls :");
+});
+test("18b · echelonDe — le repère se lit AVANT la subdivision (carte du corpus)", () => {
+  const f = exige("echelonDe");
+  /* Cartes réelles du corpus : sub:2 ET repere:"seuls24". Les croches sont
+     réglées mais inaudibles — Moteur.clic() les écarte avant d'émettre. Lire
+     sub d'abord donnerait 0, donc un pas_clic en croches pour une carte où
+     l'on n'entend que 2 et 4. */
+  egal(f({ sub: 2, repere: "seuls24" }), 3, "sub:2 + seuls24 :");
+  egal(f({ sub: 2, repere: "accent24" }), 2, "sub:2 + accent24 :");
+});
+test("10 · quadrupletDe sur une carte à sub:2 + seuls24 → soutien 3, jamais 0", () => {
+  const f = exige("quadrupletDe");
+  const q = f({ bpmTravail: 88, bpmCible: 70, preset: { sub: 2, repere: "seuls24" } });
+  egal(q.tempo, 88, "bpmTravail, jamais bpmCible :");
+  egal(q.subdivision, "croches", "table inverse de SUBDIVISIONS :");
+  egal(q.repere, "seuls24", "repère tel quel :");
+  egal(q.soutien, 3, "échelon lu, pas stocké :");
+});
+test("11 · quadrupletDe — un terme manque → null, jamais un quadruplet partiel", () => {
+  const f = exige("quadrupletDe");
+  egal(f({ preset: { sub: 2, repere: "tous" } }), null, "sans bpmTravail :");
+  egal(f({ bpmTravail: 88, preset: { sub: 7, repere: "tous" } }), null, "subdivision hors table :");
+  egal(f({ bpmTravail: 88, preset: { sub: 2 } }), null, "sans repère :");
+  egal(f({ bpmTravail: 88 }), null, "sans préréglage :");
+  egal(f(null), null, "sans carte :");
+});
+test("12 · memeQuadruplet — 78 et 80 bpm sont le même palier (§6.2)", () => {
+  exige("palierTempo");
+  egal(M.palierTempo(78), 80, "78 → 80 :");
+  egal(M.palierTempo(80), 80, "80 → 80 :");
+  egal(M.memeQuadruplet(Q(78, "croches", "accent24", 1), Q(80, "croches", "accent24", 1)), true);
+});
+test("13 · memeQuadruplet — 76 et 80 bpm sont deux paliers distincts", () => {
+  exige("palierTempo");
+  egal(M.palierTempo(76), 76, "76 → 76 :");
+  egal(M.memeQuadruplet(Q(76, "croches", "accent24", 1), Q(80, "croches", "accent24", 1)), false);
+});
+test("19 · le palier ÉLARGIT la comparabilité, il ne fusionne rien (rejeu de T8)", () => {
+  exige("palierTempo");
+  const a = Q(88, "croches", "accent24", 1);
+  egal(M.memeQuadruplet(a, a), true, "identité :");
+  egal(M.memeQuadruplet(a, Q(88, "croches", "accent24", 2)), false, "soutien :");
+  egal(M.memeQuadruplet(a, Q(92, "croches", "accent24", 1)), false, "palier voisin :");
+  egal(M.memeQuadruplet(a, Q(88, "noires", "accent24", 1)), false, "subdivision :");
+  egal(M.memeQuadruplet(a, Q(88, "croches", "seuls24", 1)), false, "repère :");
+});
+
+/* ═══ 7c · cycle de mesure — §8, §8.1 ═══════════════════════════════════════ */
+
+/* Décompte synthétique : MESURES_DECOMPTE mesures entières de `temps` temps,
+   puis le temps 1 de la mesure utile. Le générateur ne sait rien du cycle —
+   il ne fait que ce que Moteur.ordonnancer() enverrait. */
+function clicsDecompte(temps, pas_s, t0, mesures) {
+  const out = [];
+  let t = t0;
+  for (let m = 0; m < mesures; m++)
+    for (let p = 0; p < temps; p++) { out.push({ type: "clic", mesure: m, temps: p, sub: 0, t: t }); t += pas_s; }
+  return out;
+}
+function derouler(evts, etat) {
+  const f = exige("cycleMesure");
+  return evts.reduce((e, v) => f(e, v), etat || exige("cycleInitial")());
+}
+
+test("14 · l'ancre est posée au temps 1 de la 3e mesure — en 4/4 comme en 3/4", () => {
+  exige("cycleMesure");
+  [[4, 0.75], [3, 0.75]].forEach(([temps, pas]) => {
+    const t0 = 10;
+    const suite = [{ type: "demarrer" }].concat(clicsDecompte(temps, pas, t0, 2));
+    let e = derouler(suite);
+    egal(e.phase, "decompte", temps + "/4 · deux mesures consommées, toujours en décompte :");
+    egal(e.ancre, null, temps + "/4 · aucune ancre pendant le décompte :");
+    e = M.cycleMesure(e, { type: "clic", mesure: 2, temps: 0, sub: 0, t: t0 + 2 * temps * pas });
+    egal(e.phase, "mesure", temps + "/4 · passage en mesure :");
+    proche(e.ancre, t0 + 2 * temps * pas, 1e-9, temps + "/4 · ancre au temps 1 de la 3e mesure :");
+  });
+});
+test("14b · l'ancre ignore les clics qui précèdent le premier temps 1", () => {
+  exige("cycleMesure");
+  /* Moteur tourne déjà : le premier clic reçu tombe au 3e temps. Compter à
+     partir de lui donnerait moins de deux mesures de décompte. */
+  const pas = 0.75;
+  let e = derouler([{ type: "demarrer" },
+    { type: "clic", mesure: 0, temps: 2, sub: 0, t: 10.0 },
+    { type: "clic", mesure: 0, temps: 3, sub: 0, t: 10.75 }]);
+  egal(e.phase, "decompte", "aucun temps 1 encore vu :");
+  const suite = clicsDecompte(4, pas, 11.5, 2).map(c => Object.assign({}, c, { mesure: c.mesure + 1 }));
+  e = derouler(suite, e);
+  egal(e.ancre, null, "deux mesures pleines à compter du premier temps 1 :");
+  e = M.cycleMesure(e, { type: "clic", mesure: 3, temps: 0, sub: 0, t: 17.5 });
+  proche(e.ancre, 17.5, 1e-9, "ancre au bon temps 1 :");
+});
+test("15 · aucun geste retenu avant l'ancre ni après ancre + 45 s", () => {
+  exige("cycleMesure");
+  let e = derouler([{ type: "demarrer" }].concat(clicsDecompte(4, 0.75, 10, 2))
+    .concat([{ type: "geste", t: 11.2 }, { type: "geste", t: 12.9 }])
+    .concat([{ type: "clic", mesure: 2, temps: 0, sub: 0, t: 16 }]));
+  egal(e.gestes.length, 0, "gestes du décompte écartés :");
+  e = derouler([{ type: "geste", t: 20 }, { type: "geste", t: 40 },
+                { type: "geste", t: 61.5 }, { type: "geste", t: 80 }], e);
+  egal(e.gestes.length, 2, "seuls les gestes de la fenêtre de 45 s :");
+});
+test("16 · arrêt manuel : 23 gestes → abandon, 24 → bilan (frontière GESTES_MIN)", () => {
+  const N = exige("GESTES_MIN");
+  egal(N, 24, "GESTES_MIN vaut 24 (§9.1, [P]) :");
+  const amorce = [{ type: "demarrer" }].concat(clicsDecompte(4, 0.75, 10, 2))
+    .concat([{ type: "clic", mesure: 2, temps: 0, sub: 0, t: 16 }]);
+  const avec = k => {
+    const g = [];
+    for (let i = 0; i < k; i++) g.push({ type: "geste", t: 17 + i * 0.5 });
+    return derouler(amorce.concat(g).concat([{ type: "arret" }]));
+  };
+  egal(avec(N - 1).phase, "abandon", "23 gestes :");
+  egal(avec(N - 1).motif, "gestes", "et le motif est écrit :");
+  egal(avec(N).phase, "bilan", "24 gestes :");
+});
+test("16b · l'horloge ferme la mesure à 45 s, et la transition est totale", () => {
+  const D = exige("DUREE_MESURE_S");
+  egal(D, 45, "DUREE_MESURE_S vaut 45 (§8) :");
+  const amorce = [{ type: "demarrer" }].concat(clicsDecompte(4, 0.75, 10, 2))
+    .concat([{ type: "clic", mesure: 2, temps: 0, sub: 0, t: 16 }]);
+  let e = derouler(amorce.concat([{ type: "horloge", t: 16 + D - 0.01 }]));
+  egal(e.phase, "mesure", "avant 45 s :");
+  e = M.cycleMesure(e, { type: "horloge", t: 16 + D });
+  egal(e.phase, "bilan", "à 45 s :");
+  const apres = M.cycleMesure(e, { type: "geste", t: 62 });
+  egal(apres.phase, "bilan", "évènement inattendu → état inchangé, jamais d'exception :");
+  egal(M.cycleMesure(exige("cycleInitial")(), { type: "geste", t: 1 }).phase, "presentation",
+       "geste avant démarrage → ignoré :");
+});
+
+/* ═══ 7d · géométrie de la barre — §10.4.1 ══════════════════════════════════ */
+
+test("17 · positionBarre aux cinq points remarquables, et null hors domaine", () => {
+  const f = exige("positionBarre");
+  proche(f(0.12), 0, 1e-9, "bord gauche, 12 % :");
+  proche(f(0.08), 0.4444444444, 1e-6, "frontière Débuts / En progrès, 8 % :");
+  proche(f(0.06), 0.6666666667, 1e-6, "« ton habitude », 6 % :");
+  proche(f(0.045), 0.8333333333, 1e-6, "frontière Bien / Acquis, 4,5 % :");
+  proche(f(0.03), 1, 1e-9, "bord droit, 3 % :");
+  proche(f(0.20), 0, 1e-9, "borné à gauche :");
+  proche(f(0.01), 1, 1e-9, "borné à droite :");
+  egal(f(null), null, "ρ absent → null, JAMAIS 0 :");
+  egal(f(Infinity), null, "ρ non fini → null :");
+  egal(f("6"), null, "ρ non numérique → null :");
+});
+
 /* ── verdict ──────────────────────────────────────────────────────────────── */
 console.log(ligne.join("\n"));
 console.log("\n" + passes + " passés, " + echecs + " échoués.");
+if (M.__manquants && M.__manquants.length)
+  console.log("Pas encore écrites dans le bloc pur (§14 étape 7) : " + M.__manquants.join(", "));
 process.exit(echecs ? 1 : 0);
