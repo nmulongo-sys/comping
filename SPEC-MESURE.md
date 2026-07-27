@@ -1,5 +1,11 @@
 # comping — spécification du moteur de mesure intégré
 
+> Version 0.7.1 — 2026-07-27. Calibration **enregistrée** sur l'appareil de référence
+> (200 ms, dispersion 3 ms, 24/24) — point ouvert h soldé jusqu'à la valeur. Étape 2 du
+> §14 livrée : `regrouper` porté à l'identique (T2 vert contre la séance libre),
+> statistique circulaire portée, σ_locale défini (écart-type d'échantillon des
+> intervalles successifs), % en cible passé en différence circulaire (§4.3), `concluante`
+> avec ses quatre motifs ordonnés.
 > Version 0.7.0 — 2026-07-27. Première calibration de terrain (point ouvert h) : latence
 > de boucle **200 ms, ±3 ms** — mais six refus d'affilée, causés par l'appariement et non
 > par l'appareil. §2.4 point 3 remplacé (appariement par consensus), §2.5 consignant le
@@ -461,8 +467,10 @@ Statistique circulaire sur les phases `2π · dev / pas_grille`, déjà impléme
 - **Rayleigh** — `z = nR²`, p-valeur ;
 - **biais** — angle moyen ;
 - **σ_grille** = `pas_grille / 2π · √(−2 ln R)` ;
-- **σ_locale** — écart-type des intervalles entre gestes successifs. **Immune à la dérive**,
-  c'est elle qui nourrit la note (§10), pas σ_grille ;
+- **σ_locale** — écart-type **d'échantillon** (n−1) des intervalles entre gestes
+  successifs, sur le passage mesuré. **Immune à la dérive**, c'est elle qui nourrit la
+  note (§10), pas σ_grille. v1.5 ne la calculait pas — son « Régularité (σ) » affichait
+  σ_grille ;
 - **ρ = σ_locale / pas_grille** — dispersion relative, la seule grandeur comparable d'un
   tempo à l'autre. Référence mesurée : **ρ ≈ 6 %, stable de 333 à 1000 ms** **[É]**.
 - **% en cible** — part des gestes dans ±FEN, centré sur le biais.
@@ -635,8 +643,11 @@ une par quadruplet, conservée comme point d'origine **[P]**.
 1. ~~**Calibration (§2)**~~ — **faite** le 2026-07-27 (`94a208d`). L'annonce « seule brique
    sans dépendance » était fausse : la procédure §2.1 passe par le worklet, donc l'étape 2
    a été entamée en même temps. 20 tests verts, dont le test 9.
-2. **Import du worklet et de la statistique (§3, §9)** — worklet **fait** (embarqué
-   verbatim, vérifié par `diff`) ; la statistique circulaire reste à porter. Test 1
+2. ~~**Import du worklet et de la statistique (§3, §9)**~~ — **fait**. Worklet embarqué
+   verbatim (vérifié par `diff`) ; `regrouper`, statistique circulaire et `concluante`
+   portés le 2026-07-27, T2/T4/T5b/T5c verts. L'ordre des motifs de rejet est fixé :
+   gestes, tempo, Rayleigh, accroche — le tempo avant Rayleigh, parce qu'une dérive
+   couche R mécaniquement et que le motif utile est la cause, pas le symptôme. Test 1
    (worklet headless sur signal synthétique) exige un banc audio hors navigateur, non
    couvert par la suite actuelle.
 3. **Grille partagée et quadruplet (§1, §4, §6)** — tests 3, 8.
@@ -657,7 +668,7 @@ une par quadruplet, conservée comme point d'origine **[P]**.
 | e | Habillage de timbre | conditionné à une prise vérifiant σ insensible au timbre |
 | g | Justification de `fusion_ms = 120` | **instruit, non clos** — voir §3.1. Ne peut pas se faire par comparaison au nombre d'attaques attendues ; à reprendre contre ρ, sur les seules prises où la détection est saine |
 | k | Sensibilité de 2,5 trop haute pour le jeu rapide et nuancé | B5 : 84 détections brutes pour 120 attaques jouées. La sous-détection ne se corrige par aucun regroupement. Conditionne la validité de toute mesure hors corde à vide |
-| h | Première calibration réelle | **clos** (§2.5) : latence de boucle **200 ms, ±3 ms**, mesurée le 2026-07-27 sur 21 clics — bien au-dessus des 20 ms, le son passe par l'air. La valeur reste à enregistrer dans l'app par une session acceptée |
+| h | Première calibration réelle | **clos et soldé** (§2.5) : **200 ms, dispersion 3 ms, 24/24, enregistrée le 2026-07-27** sur l'appareil de référence — bien au-dessus des 20 ms, le son passe par l'air |
 | i | σ de phase contre σ_locale (§4.4) | conditionne la colonne « % en cible » du §10.2 |
 | j | Consommateurs du §2.3 | `calibrationCourante()` est exposée, rien ne l'appelle encore : le masquage du biais arrive à l'étape 5 |
 | f | Origine des doublons à 59–75 ms | **tranché** : redéclenchement sur la résonance du corps à la sortie du temps réfractaire, pas le balayage des cordes — un accord plaqué ne produit que 1,1 détection par geste. `fusion_ms = 120` les absorbe. |
