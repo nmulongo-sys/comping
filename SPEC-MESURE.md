@@ -1,5 +1,9 @@
 # comping — spécification du moteur de mesure intégré
 
+> Version 0.9.1 — 2026-07-28. §14 rafraîchi : les deux points de `pasClic` n'y figurent
+> plus comme « à arbitrer » (ils le sont, §7.3), le compte de tests est à jour, et
+> l'étape 7 — branchement du moteur dans l'interface — est nommée au lieu d'être
+> mentionnée en creux.
 > Version 0.9 — 2026-07-28. Les deux points de `pasClic` arbitrés (§7.3) : la
 > subdivision devient **obligatoire** à l'échelon 0 — plus de défaut silencieux, qui
 > était faux pour deux cartes du corpus — et l'échelon 3 reçoit sa règle exacte, qui
@@ -743,17 +747,25 @@ une par quadruplet, conservée comme point d'origine **[P]**.
    (worklet headless sur signal synthétique) exige un banc audio hors navigateur, non
    couvert par la suite actuelle.
 3. ~~**Grille partagée et quadruplet (§1, §4, §6)**~~ — **fait**. `pasGrille`, `fen` et
-   `memeQuadruplet` écrits, tests 3 et 8 verts. `pasClic` a reçu un quatrième paramètre
-   (`subdivision`) que le contrat des tests ne portait pas, et renvoie `null` à
-   l'échelon 3 hors 4/4 : deux points imposés par le code, à arbitrer.
+   `memeQuadruplet` écrits, tests 3 et 8 verts. Les deux points que `pasClic` avait posés
+   seuls — subdivision à l'échelon 0, échelon 3 hors 4/4 — sont **arbitrés et corrigés**
+   le 2026-07-28 (§7.3), avec T3d et T3e.
 4. ~~**Échelle de soutien (§7)**~~ — **fait**. `echelonDepart` écrit sur les seuils
    provisoires de 76 et 132 bpm. La règle de progression du §7.2 est portée par le même
    compteur que le plafond du §10.3, `serieAcquise`.
-5. ~~**Bilan et note proposée (§10)**~~ — **fait** le 2026-07-28. `noteProposee` écrite,
-   décisions d'implémentation au §10.7, six tests passés au vert : la suite de mesure est
-   à 21 sur 21. Reste hors périmètre de l'étape : le branchement dans l'interface, la
-   barre graduée du §10.4 et le masquage du biais du §2.3 (point ouvert j).
+5. ~~**Bilan et note proposée (§10)**~~ — **fait** le 2026-07-28. `noteProposee` et
+   `serieAcquise` écrites, décisions d'implémentation au §10.7. Suite de mesure à
+   **23 sur 23**, calibration à 23 sur 23. Le bloc de fonctions pures est complet : tout
+   ce qui suit touche l'interface ou le terrain, plus la mesure elle-même.
 6. `FEN` relative activée **le jour où la seconde série confirme les 6 %**, pas avant.
+   Une seule ligne à changer, `FEN_RELATIVE`. Conditionnée à la capture, pas au calendrier.
+7. **Branchement du moteur dans l'interface** — la seule étape entièrement neuve qui
+   reste, et la première qui ne soit pas une fonction pure. Trois morceaux, spécifiés mais
+   non écrits : le cycle de mesure d'une carte (§8 : décompte non mesuré, 45 s, bilan), la
+   barre graduée du §10.4 (axe 12 % → 3 %, repère « ton habitude » à 6 %, marqueur fantôme
+   au même quadruplet, zone « Acquis » hachurée tant que le plafond tient), et le masquage
+   du biais en l'absence de calibration (§2.3 — `calibrationCourante()` est exposée et
+   n'a toujours aucun appelant, point ouvert j).
 
 ---
 
