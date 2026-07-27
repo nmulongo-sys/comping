@@ -1270,6 +1270,101 @@ function calibrationCourante(){
   try{ return S.calibration[empreinteAppareil()]||null; }catch(e){ return null; }
 }
 
+/* ── fonctions pures de mesure, testables sous Node ─────────────────────────
+   §1 grille partagée · §4 pas et fenêtre en cible · §6 quadruplet de contexte
+   · §7 échelle de soutien.
+
+   Bloc EXTRAIT à l'exécution par tests/mesure-pur.js, jamais recopié — une
+   copie dériverait. Contrainte qui en découle : aucune référence au DOM, à
+   `window`, à `ctx` ni à `S` ne doit entrer ici, sinon l'extraction casse. */
+
+/* Fenêtre en cible (§4.2). Tant que COEF_FEN n'est pas confirmé par la
+   seconde série de capture, FEN_RELATIVE reste à false et l'app conserve
+   ±25 ms : un seul point de bascule, une seule ligne à changer le jour où
+   la seconde série tranche (§14 étape 6). */
+const FEN_RELATIVE = false;
+const COEF_FEN     = 0.06;
+const PLANCHER_FEN = 12;
+const FEN_FIXE_MS  = 25;
+
+/* Valeur rythmique demandée par la carte → nombre de pas par temps. Le
+   quadruplet du §6 stocke un libellé ("croches") ; pasGrille() veut un
+   facteur (2). La table fait le pont, et elle seule. */
+const SUBDIVISIONS = { noires: 1, croches: 2, triolets: 3, doubles: 4 };
+function facteurSubdivision(nom){
+  const f = SUBDIVISIONS[nom];
+  return f === undefined ? null : f;
+}
+
+/* §4.1 — pas de la GRILLE d'évaluation, imposé par la carte. C'est le pas
+   contre lequel les phases sont calculées, et il ne dépend pas de ce qui
+   est entendu : couper le clic ne coupe pas la grille (§1). */
+function pasGrille(bpm, subdivision){
+  if(!(bpm > 0) || !(subdivision > 0)) return null;
+  return 60 / bpm / subdivision;
+}
+
+/* §7 — pas de ce qui est ENTENDU, imposé par l'échelon de soutien.
+   Renvoie null quand il n'y a pas de clic à intervalle constant : la grille
+   interne continue seule, la mesure reste pleinement possible.
+
+   Le quatrième paramètre ne figure pas au contrat des tests. Il fallait
+   pourtant le poser : l'échelon 0 vaut « temps + subdivision », donc
+   pas_clic = pas_grille, et une signature à trois arguments ne porte pas la
+   subdivision. Défaut à 2 (croches), qui est le cas de T3 — à trancher au
+   §7 le jour où une carte demandera des triolets à l'échelon 0.
+
+   Échelon 3 (2 et 4 seulement) : les deux clics sont espacés de 2 temps puis
+   de tempsParMesure − 2. Le pas n'est régulier qu'en 4/4 ; ailleurs il n'y a
+   pas de pas de clic, et la fonction le dit. */
+function pasClic(bpm, echelon, tempsParMesure, subdivision){
+  if(!(bpm > 0)) return null;
+  const noire = 60 / bpm;
+  const sub = subdivision === undefined ? 2 : subdivision;
+  switch(echelon){
+    case 0: return sub > 0 ? noire / sub : null;
+    case 1: return noire;
+    case 2: return noire;
+    case 3: return tempsParMesure === 4 ? 2 * noire : null;
+    case 4: return null;
+    case 5: return null;
+    default: return null;
+  }
+}
+
+/* §4.2 — FEN = max(COEF_FEN × pas_grille, PLANCHER_FEN), ou ±25 ms tant que
+   la bascule n'est pas faite. La constante de ±25 ms est juste par accident
+   autour de 375–400 ms, absurdement sévère à 1000 ms, laxiste à 250 ms. */
+function fen(pasGrilleMs, opts){
+  const o = opts || {};
+  const rel = o.FEN_RELATIVE === undefined ? FEN_RELATIVE : o.FEN_RELATIVE;
+  if(!rel) return FEN_FIXE_MS;
+  const coef = o.COEF_FEN === undefined ? COEF_FEN : o.COEF_FEN;
+  const plancher = o.PLANCHER_FEN === undefined ? PLANCHER_FEN : o.PLANCHER_FEN;
+  return Math.max(coef * pasGrilleMs, plancher);
+}
+
+/* §7.1 — l'échelon de départ d'une carte n'est pas libre, il dépend du
+   tempo. Seuils provisoires, les moins étayés du document : une prise par
+   condition. Au-delà de 132 bpm l'échelon reste 1, pas_clic à la noire —
+   c'est déjà le comportement de l'échelon 1, d'où deux cas et non trois. */
+function echelonDepart(bpm){
+  return bpm <= 76 ? 0 : 1;
+}
+
+/* §6 — deux mesures ne sont comparables que si leur quadruplet est
+   identique. Un seul champ qui diffère ouvre une série distincte : c'est la
+   règle qui empêche l'historique de mentir quand une carte monte d'échelon. */
+function memeQuadruplet(a, b){
+  if(!a || !b) return false;
+  return a.tempo === b.tempo
+      && a.subdivision === b.subdivision
+      && a.repere === b.repere
+      && a.soutien === b.soutien;
+}
+
+/* ── fin des fonctions pures de mesure ──────────────────────────────────── */
+
 /* ── micro + worklet ────────────────────────────────────────────────────── */
 
 const Detecteur = {
