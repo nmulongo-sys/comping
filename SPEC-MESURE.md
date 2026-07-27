@@ -1,5 +1,10 @@
 # comping — spécification du moteur de mesure intégré
 
+> Version 0.8 — 2026-07-28. Étape 5 du §14 livrée : `noteProposee` et le compteur
+> partagé `serieAcquise` (§10.3 / §7.2) écrits dans le bloc de fonctions pures, les six
+> tests en attente passés au vert. §10.7 consigne les quatre choix que les §10.2 et §10.3
+> laissaient ouverts : bornes de la colonne « % en cible », ordre des trois règles, échec
+> fermé sur la concluance, lecture de l'historique. Étapes 3 et 4 marquées faites au §14.
 > Version 0.7.1 — 2026-07-27. Calibration **enregistrée** sur l'appareil de référence
 > (200 ms, dispersion 3 ms, 24/24) — point ouvert h soldé jusqu'à la valeur. Étape 2 du
 > §14 livrée : `regrouper` porté à l'identique (T2 vert contre la séance libre),
@@ -569,6 +574,38 @@ enregistre un échec qui n'a pas eu lieu.
 Le moteur SM-2 simplifié de `comping` reste intact : intervalles, plafond 90 jours,
 crédit de rappel ×1,15. La mesure alimente son entrée, elle ne le remplace pas.
 
+### 10.7 Décisions d'implémentation — livrées le 2026-07-28
+
+Quatre choix que les §10.2 et §10.3 laissaient ouverts, tranchés à l'écriture et tenus
+par les six tests T5, T5d, T8b, T8c, §10.2 et §10.2b.
+
+1. **Bornes de la colonne « % en cible ».** La table les donne en approximatif
+   (≳ 80, ≈ 68–80, ≈ 55–68, ≲ 55) parce qu'elles décrivent une attente, pas un critère.
+   Le code, lui, doit trancher : **80, 68 et 55**, bornes basses incluses. Elles ne
+   servent qu'au contrôle de cohérence — aucune note n'est jamais décidée par cette
+   colonne seule. Elles restent **[P]** tant que le point ouvert i (σ de phase contre
+   σ_locale) n'est pas soldé : c'est lui qui dit ce que le % en cible mesure vraiment.
+2. **Ordre des trois règles.** §10.5 d'abord (une mesure non concluante ne pré-coche
+   rien), §10.2 ensuite (rang de ρ, corrigé par la discordance), §10.3 en dernier
+   (plafond). Conséquence utile, et non un accident : une lecture discordante ne peut
+   jamais retenir « Acquis », puisqu'elle retient la plus basse des deux lectures — le
+   plafond ne se pose alors même pas.
+3. **Échec fermé sur la concluance.** `noteProposee` ne propose rien tant qu'elle n'a pas
+   reçu un `{ok: true}` explicite. Un appelant qui oublierait de passer le verdict du
+   §9.1 obtient `note: null` et le motif « non concluante », jamais une note. Le §10.5
+   est une règle de sûreté : elle ne peut pas dépendre de la discipline de l'appelant.
+4. **Lecture de l'historique (§10.3).** `historique` est la liste des mesures
+   **antérieures**, la plus récente en dernier ; la mesure du jour n'y figure pas. Le
+   plafond ne se lève que si les **trois dernières** entrées sont toutes concluantes,
+   toutes au quadruplet courant et toutes à ρ ≤ 4,5 %. Moins de trois entrées, ou une
+   seule qui rompt la série, et le plafond tient. La lecture est isolée dans
+   `serieAcquise(historique, quadruplet)` : c'est **le** compteur du §7.2, appelé au même
+   endroit par les deux règles, et non deux comptages à tenir synchronisés.
+
+Ce que ces quatre points ne tranchent pas : la latence n'entre toujours dans aucun calcul
+(§10.1), et le motif renvoyé reste `null` dès que la mesure est concluante — il ne porte
+que le motif de rejet du §9.1, jamais une explication de la note.
+
 ---
 
 ## 11. Stockage — `comping_v2`
@@ -650,9 +687,17 @@ une par quadruplet, conservée comme point d'origine **[P]**.
    couche R mécaniquement et que le motif utile est la cause, pas le symptôme. Test 1
    (worklet headless sur signal synthétique) exige un banc audio hors navigateur, non
    couvert par la suite actuelle.
-3. **Grille partagée et quadruplet (§1, §4, §6)** — tests 3, 8.
-4. **Échelle de soutien (§7)** — tests 3, 6.
-5. **Bilan et note proposée (§10)** — tests 4, 5, 7.
+3. ~~**Grille partagée et quadruplet (§1, §4, §6)**~~ — **fait**. `pasGrille`, `fen` et
+   `memeQuadruplet` écrits, tests 3 et 8 verts. `pasClic` a reçu un quatrième paramètre
+   (`subdivision`) que le contrat des tests ne portait pas, et renvoie `null` à
+   l'échelon 3 hors 4/4 : deux points imposés par le code, à arbitrer.
+4. ~~**Échelle de soutien (§7)**~~ — **fait**. `echelonDepart` écrit sur les seuils
+   provisoires de 76 et 132 bpm. La règle de progression du §7.2 est portée par le même
+   compteur que le plafond du §10.3, `serieAcquise`.
+5. ~~**Bilan et note proposée (§10)**~~ — **fait** le 2026-07-28. `noteProposee` écrite,
+   décisions d'implémentation au §10.7, six tests passés au vert : la suite de mesure est
+   à 21 sur 21. Reste hors périmètre de l'étape : le branchement dans l'interface, la
+   barre graduée du §10.4 et le masquage du biais du §2.3 (point ouvert j).
 6. `FEN` relative activée **le jour où la seconde série confirme les 6 %**, pas avant.
 
 ---
