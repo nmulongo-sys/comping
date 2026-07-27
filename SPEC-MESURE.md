@@ -1,5 +1,9 @@
 # comping — spécification du moteur de mesure intégré
 
+> Version 0.7.0 — 2026-07-27. Première calibration de terrain (point ouvert h) : latence
+> de boucle **200 ms, ±3 ms** — mais six refus d'affilée, causés par l'appariement et non
+> par l'appareil. §2.4 point 3 remplacé (appariement par consensus), §2.5 consignant le
+> terrain, réfractaire abaissé à 30 ms pendant la calibration seule.
 > Version 0.6.1 — 2026-07-27. Collision de numérotation corrigée : « Gestes exclus »
 > passe de §3.1 à §3.2.
 > Version 0.6 — 2026-07-27. Capture complète versionnée : test 2 recadré sur une
@@ -109,12 +113,14 @@ Trois choix que le §2.1 laissait ouverts, tranchés à l'écriture et testés :
    gain 0,34) est une autre attaque, donc une autre latence. La synthèse est extraite
    dans `emettreClic()`, partagée avec le métronome, pour que les deux ne puissent plus
    diverger silencieusement.
-3. **Appariement.** Pour chaque clic programmé, la **première** détection dans
-   `[t − 50 ms, t + 500 ms]`, et une détection ne sert qu'une fois. Conséquence directe
-   du point ouvert f : au haut-parleur, un clic produit deux à trois détections par
-   résonance. Sans cette règle, 24 clics en donnent une soixantaine et la médiane est
-   sans objet. Corollaire testé : **un clic manqué ne décale pas le suivant d'un cran** —
-   un appariement par simple ordre injecterait une erreur de 1000 ms dans la médiane.
+3. **Appariement — remplacé en v0.7.0, voir §2.5.** La règle initiale — la **première**
+   détection dans `[t − 50 ms, t + 500 ms]`, une détection ne servant qu'une fois —
+   visait la résonance (point ouvert f), qui produit ses doublons *après* l'attaque.
+   Elle est sans défense contre un bruit ambiant qui précède l'arrivée du clic, et le
+   terrain l'a mise en échec six fois de suite. Règle en vigueur : **appariement par
+   consensus** (§2.5). Le corollaire testé demeure : **un clic manqué ne décale pas le
+   suivant d'un cran** — un appariement par simple ordre injecterait une erreur de
+   1000 ms dans la médiane.
 
 ### 2.3 Comportement en l'absence de calibration
 
@@ -130,6 +136,49 @@ L'app **fonctionne**, mais :
 
 La note ne dépend jamais de la latence (§10), donc l'absence de calibration ne bloque pas
 le travail. Elle bloque seulement la lecture du placement en avant / en arrière.
+
+### 2.5 Appariement par consensus — **[É]** imposé par le terrain du 2026-07-27
+
+**Le terrain.** Première calibration réelle : six refus consécutifs, dispersions
+affichées de 88,7 à 193,8 ms. Le relevé détaillé de la sixième session
+(`tests/fixtures/calibration-2026-07-27-refus.json`) montre **136 détections brutes pour
+24 clics** — un environnement à ≈ 4,7 détections parasites par seconde — et, dessous, une
+boucle acoustique **parfaitement saine : 21 clics sur 24 arrivés à +197…+203 ms**. Latence
+200 ms, écart interquartile 3 ms. L'appareil n'a jamais été le problème.
+
+**Le mécanisme de l'échec.** L'appariement glouton prend la *première* détection de la
+fenêtre : presque toujours un bruit antérieur à l'arrivée du clic. Les retards appariés
+étaient du bruit (−43 à +67 ms mêlés aux vrais +200), la médiane de 9 ms ne mesurait
+rien, et l'écart interquartile explosait — c'est lui qui refusait, à raison, mais pour la
+mauvaise cause apparente. Trois clics (6, 10, 11) étaient de surcroît **masqués** : un
+bruit tombé 40 à 48 ms avant l'arrivée déclenche le réfractaire de 55 ms, qui avale la
+vraie détection.
+
+**La règle en vigueur.** `apparier(programmes, detections)` renvoie désormais
+`{paires, consensus_ms, support}` :
+
+1. pour chaque clic, tous les **candidats** dans `[t − 50 ms, t + 500 ms]` ;
+2. le **consensus** est le retard de support maximal — le nombre de clics ayant au moins
+   un candidat à ±10 ms **[P]** de ce retard ; à support égal, le plus petit retard
+   l'emporte (dégénère en « première détection » quand il n'y a qu'un clic, ce qui
+   conserve la sémantique du point ouvert f pour la résonance) ;
+3. chaque clic est apparié à sa détection **la plus proche du consensus**, à ±20 ms
+   **[P]**, une détection ne servant toujours qu'une fois ;
+4. un clic sans candidat dans ce rayon reste non apparié — le verdict du §2.1 point 5
+   (≥ 20 clics, IQR ≤ 15 ms) est inchangé et suffit.
+
+Un bruit périodique verrouillé sur la seconde à ±10 ms près pendant 24 s serait
+indiscernable d'un clic ; il n'existe pas dans une pièce.
+
+**Réfractaire abaissé pendant la calibration seule.** `minIOI` passe de 55 à **30 ms
+[P]** pour la durée de la procédure — les clics sont à 1000 ms, le coût est nul, et cela
+récupère les arrivées masquées par un bruit à 30–55 ms. Le paramètre de travail
+`ECART_MIN_MS = 55` ne change pas. Sur la session de référence, le consensus seul rend
+21/24 ; le réfractaire abaissé aurait rendu les clics 6, 10 et 11 (bruit à 40–48 ms).
+
+**Conséquence pratique.** Le silence ambiant aide mais n'est plus une condition : la
+procédure tolère l'environnement qui l'a mise en échec. Rejouée sur la session de
+référence, elle rend **latence 200,0 ms, dispersion 3,0 ms, n = 21 → acceptée**.
 
 ---
 
@@ -608,7 +657,7 @@ une par quadruplet, conservée comme point d'origine **[P]**.
 | e | Habillage de timbre | conditionné à une prise vérifiant σ insensible au timbre |
 | g | Justification de `fusion_ms = 120` | **instruit, non clos** — voir §3.1. Ne peut pas se faire par comparaison au nombre d'attaques attendues ; à reprendre contre ρ, sur les seules prises où la détection est saine |
 | k | Sensibilité de 2,5 trop haute pour le jeu rapide et nuancé | B5 : 84 détections brutes pour 120 attaques jouées. La sous-détection ne se corrige par aucun regroupement. Conditionne la validité de toute mesure hors corde à vide |
-| h | Première calibration réelle | aucune valeur de terrain à ce jour. À relever : nombre de clics entendus sur 24, et ordre de grandeur de la latence — sous 20 ms, le micro capte par le boîtier et non par l'air |
+| h | Première calibration réelle | **clos** (§2.5) : latence de boucle **200 ms, ±3 ms**, mesurée le 2026-07-27 sur 21 clics — bien au-dessus des 20 ms, le son passe par l'air. La valeur reste à enregistrer dans l'app par une session acceptée |
 | i | σ de phase contre σ_locale (§4.4) | conditionne la colonne « % en cible » du §10.2 |
 | j | Consommateurs du §2.3 | `calibrationCourante()` est exposée, rien ne l'appelle encore : le masquage du biais arrive à l'étape 5 |
 | f | Origine des doublons à 59–75 ms | **tranché** : redéclenchement sur la résonance du corps à la sortie du temps réfractaire, pas le balayage des cordes — un accord plaqué ne produit que 1,1 détection par geste. `fusion_ms = 120` les absorbe. |
