@@ -1,5 +1,9 @@
 # comping — spécification du moteur de mesure intégré
 
+> Version 0.9 — 2026-07-28. Les deux points de `pasClic` arbitrés (§7.3) : la
+> subdivision devient **obligatoire** à l'échelon 0 — plus de défaut silencieux, qui
+> était faux pour deux cartes du corpus — et l'échelon 3 reçoit sa règle exacte, qui
+> dépend du nombre de temps et pas seulement du 4/4. Table du §7 corrigée.
 > Version 0.8 — 2026-07-28. Étape 5 du §14 livrée : `noteProposee` et le compteur
 > partagé `serieAcquise` (§10.3 / §7.2) écrits dans le bloc de fonctions pures, les six
 > tests en attente passés au vert. §10.7 consigne les quatre choix que les §10.2 et §10.3
@@ -391,10 +395,10 @@ un objectif unique.
 
 | Échelon | Nom | Entendu | `pas_clic` |
 |---|---|---|---|
-| 0 | soutien plein | temps + subdivision | `pas_grille` |
+| 0 | soutien plein | temps + subdivision | `pas_grille` — subdivision requise, §7.3 |
 | 1 | temps seuls | chaque temps | noire |
 | 2 | `accent24` | tous les temps, 2 et 4 accentués | noire |
-| 3 | `seuls24` | 2 et 4 seulement | blanche |
+| 3 | `seuls24` | 2 et 4 seulement | blanche en 4/4, sinon voir §7.3 |
 | 4 | clic troué | une mesure sur deux | — |
 | 5 | sans clic | rien (grille interne maintenue) | — |
 
@@ -429,6 +433,57 @@ constant, ouvrent une proposition :
 
 Le soutien avant le tempo, parce que c'est l'axe neuf et le moins coûteux à redescendre.
 Proposition, jamais application automatique. **Arbitrage retenu : soutien d'abord.**
+
+### 7.3 `pas_clic` — deux points arbitrés le 2026-07-28
+
+Deux points que le code avait posés seuls, l'un et l'autre faux sur des cartes du corpus
+existant. Ils sont tranchés ici avant d'être corrigés.
+
+**1. La subdivision est obligatoire à l'échelon 0.** L'échelon 0 vaut « temps +
+subdivision », donc `pas_clic = pas_grille`, qui dépend de la subdivision. La signature à
+trois arguments ne la portait pas ; le code avait posé un défaut à 2 (croches). Ce défaut
+est faux pour deux cartes qui existent :
+
+| Carte | Subdivision | Tempo | Échelon de départ (§7.1) |
+|---|---|---|---|
+| `ar-triolets` | 3 | 60 | **0** |
+| `ar-doubles` | 4 | 60 | **0** |
+
+Toutes deux démarrent à l'échelon 0 avec un clic en croches contre une grille en triolets
+ou en doubles : le §7 est contredit, et rien ne le signale. **Arbitrage retenu : plus de
+défaut.** `pasClic(bpm, echelon, tempsParMesure, subdivision)` renvoie `null` à l'échelon 0
+si la subdivision manque. Une réponse fausse devient une absence visible — c'est la règle
+suivie partout ailleurs dans ce document. L'appelant l'a de toute façon : le quadruplet du
+§6 la porte, `facteurSubdivision()` fait le pont du libellé au facteur.
+
+Le test T3 ne l'avait pas vu parce qu'il est écrit avec `sub = 2` : le défaut satisfaisait
+exactement l'hypothèse du test. Il passe désormais la subdivision explicitement.
+
+**2. L'échelon 3 ne dépend pas du 4/4, mais du nombre de temps.** « Régulier seulement en
+4/4 » était trop grossier. En `seuls24`, seuls les temps 2 et 4 sonnent ; en deçà de
+quatre temps le temps 4 n'existe pas, et il ne reste qu'un clic par mesure — parfaitement
+régulier.
+
+| Mesure | Clics entendus | Intervalles | Régulier | `pas_clic` |
+|---|---|---|---|---|
+| 1 temps | aucun | — | — | `null` |
+| 2/4 | temps 2 | 2 noires | oui | 2 × noire |
+| 3/4 | temps 2 | 3 noires | oui | 3 × noire |
+| 4/4 | temps 2 et 4 | 2, 2 | oui | 2 × noire |
+| 5/4 | temps 2 et 4 | 2, 3 | **non** | `null` |
+| 6/8 | temps 2 et 4 | 2, 4 | **non** | `null` |
+
+**Arbitrage retenu :** `T ≤ 3` → `T × noire` · `T = 4` → `2 × noire` · `T ≥ 5` → `null`.
+
+Le cas n'est pas théorique : `scarborough` est en 3/4, et la progression du §7.2 l'amènera
+à l'échelon 3. Le métronome y clique bel et bien une fois par mesure, pendant que
+`pasClic` répondait qu'il n'y avait pas de clic — une carte soutenue traitée comme une
+carte sans soutien.
+
+**Ce que ces deux points ne tranchent pas.** L'échelon 3 en 6/8 reste sans pas de clic
+régulier : la grille interne continue seule et la mesure reste possible (§7, échelons 4 et
+5), mais la question de savoir si `seuls24` a un sens musical en 6/8 n'est pas une question
+de mesure, et n'est pas tranchée ici.
 
 ---
 
