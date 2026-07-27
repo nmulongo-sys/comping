@@ -1,5 +1,8 @@
 # comping — spécification du moteur de mesure intégré
 
+> Version 0.4 — 2026-07-27. Correction de version (v1.5, pas v1.6), §3.0 séparant
+> `ecart_min_ms` de `fusion_ms` et fixant la règle de regroupement d'après le source,
+> contrainte réseau levée, point ouvert f tranché.
 > Version 0.3 — 2026-07-27. Libellés définitifs, plafond sur « Acquis », échelle graduée.
 > Version 0.2 — 2026-07-27. §7.1, §7.2 et §10.2 arbitrés.
 > Version 0.1 — 2026-07-27. **Document de spécification, à valider avant toute ligne de code.**
@@ -13,8 +16,8 @@
 
 | | |
 |---|---|
-| **Objet** | Fusionner la chaîne de mesure d'`analyse-attaque` v1.6 dans `comping/index.html`, de sorte qu'une carte travaillée produise une mesure comparable dans le temps, et une **proposition** de note SRS. |
-| **Contrainte** | Fichier HTML unique, zéro dépendance, hors ligne, mobile d'abord. Aucune sortie réseau. |
+| **Objet** | Fusionner la chaîne de mesure d'`analyse-attaque` v1.5 dans `comping/index.html`, de sorte qu'une carte travaillée produise une mesure comparable dans le temps, et une **proposition** de note SRS. |
+| **Contrainte** | Fichier HTML unique, zéro dépendance de code, mobile d'abord. **Contrainte réseau levée le 2026-07-27** (arbitrage Jean, app à usage personnel) : les trois balises de polices Google de `comping/index.html` restent. Seule sortie réseau admise ; hors ligne, l'app se rabat sur les polices système sans perte de fonction. Aucune autre requête. |
 | **Non-objet** | Noter automatiquement. Corriger le placement. Mesurer les étouffées ou les liaisons main gauche. |
 | **Bloqué par** | Points ouverts 1 à 4 du brief pour les *valeurs* de deux constantes (§5, §10). La *structure* ci-dessous ne dépend pas de leur issue. |
 
@@ -105,15 +108,48 @@ le travail. Elle bloque seulement la lecture du placement en avant / en arrière
 
 ## 3. Chaîne de détection importée
 
-Reprise **telle quelle** d'`analyse-attaque` v1.6, worklet compris (Blob depuis
+Reprise **telle quelle** d'`analyse-attaque` **v1.5**, worklet compris (Blob depuis
 `<script type="text/plain">`) : `N = 1024`, `HOP = 256`, trame 5,33 ms à 48 kHz,
 blanchiment adaptatif, flux spectral, seuil adaptatif médian sur 45 trames.
 
+> **Correction de version, 2026-07-27.** Cette spec a d'abord écrit « v1.6 ». `index.html`
+> n'a jamais eu de v1.6 : le dernier commit touchant l'app est la **v1.5** (`7febc61`), la
+> v1.6 n'ayant livré que `protocole.html`, `PROTOCOLE.md` et le README. Le fichier de
+> référence est donc l'`index.html` v1.5, 57 382 octets.
+
+### 3.0 Deux paramètres distincts, à ne jamais confondre
+
+Le code et l'export en distinguent deux ; la première rédaction de cette spec les avait
+fondus sous un seul nom, ce qui aurait figé le mauvais.
+
+| Paramètre | Où | Valeur observée | Rôle |
+|---|---|---|---|
+| `ecart_min_ms` (`minIOI`) | dans le worklet | 55 ms | temps réfractaire du détecteur : deux montées plus rapprochées ne produisent qu'une détection. |
+| `fusion_ms` | après le worklet, `regrouper()` | 120 ms | regroupement des détections en **gestes**. C'est celui que cette spec fige. |
+
+**Règle de regroupement, relevée dans le source v1.5** (`regrouper()`), à reprendre à
+l'identique — une reconstitution qui colle aux données peut être fausse, c'est arrivé :
+
+```js
+nouveau geste  si   t − geste.tFin > fusion_ms      // écart à la DERNIÈRE détection du geste
+               ou   t − geste.t    > 2,5 × fusion_ms // plafond d'étalement, mesuré depuis le chef
+```
+
+- le geste porte le temps de son **chef** (première détection) ;
+- son intensité est le **maximum** du groupe, **jamais celle du chef** — divergent sur 15
+  des 52 gestes de la séance libre du 27, soit 29 % ;
+- son étalement est `tFin − t`.
+
 Trois changements, et trois seulement :
 
-1. **`ecart_min_ms = 120`, figé, non exposé** **[É]**. Balayé de 30 à 600 ms sur treize
-   prises : l'accroche R ne bouge pas, seul le comptage change. Ce n'est pas un paramètre
-   de qualité, c'est un paramètre d'affichage. L'élève ne le voit jamais.
+1. **`fusion_ms = 120`, figé, non exposé** **[P]**. Balayé de 30 à 600 ms sur treize
+   prises : l'accroche R ne bouge pas, seul le comptage change — **[É]** pour cette
+   invariance. Mais la conclusion « paramètre d'affichage » ne vaut que pour R. Elle est
+   **fausse pour le moteur v2** : ρ = σ_locale / pas_grille est bâti sur les intervalles
+   successifs et constitue la seule entrée de la note (§10.1). Abaisser le seuil injecte
+   des intervalles parasites de quelques dizaines de millisecondes ; ρ enfle et la note
+   s'effondre sans que le jeu ait changé. La valeur reste figée à 120 ms et invisible pour
+   l'élève, mais **sa justification est à refaire contre ρ, pas contre R** — point ouvert.
 2. **Distinction détection / geste conservée.** Toutes les statistiques portent sur les
    gestes. Un accord plaqué produit 1,1 détection par geste, une corde nylon pincée au
    doigt jusqu'à 3,6 : le regroupement n'est pas cosmétique.
@@ -462,7 +498,7 @@ une par quadruplet, conservée comme point d'origine **[P]**.
 | # | Test | Attendu |
 |---|---|---|
 | 1 | Worklet headless sur signal synthétique, 5 tirages × 16 attaques, bruit −60 à −38 dB | 79/80 détectées minimum, σ ≤ 7 ms |
-| 2 | Rejeu des 293 détections réelles d'`analyse-attaque` | mêmes gestes qu'en v1.6 avec `ecart_min_ms = 120` |
+| 2 | Rejeu des 293 détections réelles d'`analyse-attaque` | **162 gestes** (référence inscrite dans le source v1.5) avec `fusion_ms = 120` |
 | 3 | Grille : changement d'échelon de soutien en cours de carte | ancre et `pas_grille` inchangés, `pas_clic` seul modifié |
 | 4 | Cohérence FEN/σ : jeu synthétique à ρ = 6 % | % en cible dans [64 %, 72 %] |
 | 5 | Mesure à tempo dérivant de 5 % | rejetée, motif « tempo », aucune note proposée |
@@ -494,4 +530,4 @@ une par quadruplet, conservée comme point d'origine **[P]**.
 | c | Vérification d'accord par chromagramme 8192 | point ouvert 6, spécifiée ailleurs |
 | d | Ratio de swing dans `recalculer()` | chapitres 9–11, hors périmètre |
 | e | Habillage de timbre | conditionné à une prise vérifiant σ insensible au timbre |
-| f | Origine des doublons à 59–75 ms | point ouvert 7 ; sans effet sur cette spec, `ecart_min_ms = 120` les absorbe |
+| f | Origine des doublons à 59–75 ms | **tranché** : redéclenchement sur la résonance du corps à la sortie du temps réfractaire, pas le balayage des cordes — un accord plaqué ne produit que 1,1 détection par geste. `fusion_ms = 120` les absorbe. |
