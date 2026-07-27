@@ -1347,24 +1347,37 @@ function pasGrille(bpm, subdivision){
    Renvoie null quand il n'y a pas de clic à intervalle constant : la grille
    interne continue seule, la mesure reste pleinement possible.
 
-   Le quatrième paramètre ne figure pas au contrat des tests. Il fallait
-   pourtant le poser : l'échelon 0 vaut « temps + subdivision », donc
-   pas_clic = pas_grille, et une signature à trois arguments ne porte pas la
-   subdivision. Défaut à 2 (croches), qui est le cas de T3 — à trancher au
-   §7 le jour où une carte demandera des triolets à l'échelon 0.
+   Les deux points arbitrés au §7.3, tous deux faux auparavant sur des cartes
+   du corpus existant :
 
-   Échelon 3 (2 et 4 seulement) : les deux clics sont espacés de 2 temps puis
-   de tempsParMesure − 2. Le pas n'est régulier qu'en 4/4 ; ailleurs il n'y a
-   pas de pas de clic, et la fonction le dit. */
+   · Échelon 0 — vaut « temps + subdivision », donc pas_clic = pas_grille,
+     qui dépend de la subdivision. Elle est OBLIGATOIRE : plus de défaut à 2,
+     qui donnait un clic en croches contre une grille en triolets pour
+     ar-triolets et en doubles pour ar-doubles — l'une et l'autre à 60 bpm,
+     donc à l'échelon 0 de départ (§7.1). Sans subdivision, null : une
+     absence visible plutôt qu'une réponse fausse.
+
+   · Échelon 3 (2 et 4 seulement) — le pas dépend du NOMBRE DE TEMPS, pas du
+     seul 4/4. En deçà de quatre temps, le temps 4 n'existe pas : il ne reste
+     qu'un clic par mesure, parfaitement régulier (scarborough est en 3/4).
+     À partir de cinq temps, les clics sont espacés de 2 puis de T−2 et ne
+     sont plus équidistants.
+       T = 1  aucun clic                 → null
+       T ≤ 3  un clic, période T noires  → T × noire
+       T = 4  deux clics équidistants    → 2 × noire
+       T ≥ 5  intervalles 2 et T−2       → null                            */
 function pasClic(bpm, echelon, tempsParMesure, subdivision){
   if(!(bpm > 0)) return null;
   const noire = 60 / bpm;
-  const sub = subdivision === undefined ? 2 : subdivision;
+  const T = tempsParMesure;
   switch(echelon){
-    case 0: return sub > 0 ? noire / sub : null;
+    case 0: return subdivision > 0 ? noire / subdivision : null;
     case 1: return noire;
     case 2: return noire;
-    case 3: return tempsParMesure === 4 ? 2 * noire : null;
+    case 3:
+      if(!(T >= 2)) return null;
+      if(T <= 3) return T * noire;
+      return T === 4 ? 2 * noire : null;
     case 4: return null;
     case 5: return null;
     default: return null;
