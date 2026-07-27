@@ -1,5 +1,7 @@
 # comping — spécification du moteur de mesure intégré
 
+> Version 0.6.1 — 2026-07-27. Collision de numérotation corrigée : « Gestes exclus »
+> passe de §3.1 à §3.2.
 > Version 0.6 — 2026-07-27. Capture complète versionnée : test 2 recadré sur une
 > référence reproductible, point ouvert g instruit et rouvert autrement, point ouvert k
 > sur la sous-détection, §16 corrigé.
@@ -207,7 +209,7 @@ Trois changements, et trois seulement :
 3. **Casque verrouillant.** Sans confirmation explicite, pas de mesure. Seule exception :
    l'écran de calibration du §2.
 
-### 3.1 Gestes exclus du parcours de mesure **[É]**
+### 3.2 Gestes exclus du parcours de mesure **[É]**
 
 Mesuré, pas supposé :
 
