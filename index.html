@@ -683,7 +683,7 @@ const CHAPITRES = [
 function C(id,ch,type,main,titre,consigne,critere,bpm,opts){
   opts = opts||{};
   const base = {bpm,temps:4,sub:1,swing:false,repere:"tous",gap:false,gapJouees:2,gapMuettes:2,
-                ramp:false,rampTous:8,rampPas:2,rampMax:bpm+30};
+                ramp:false,rampTous:8,rampPas:2,rampMax:bpm+30,muet:false};
   return {id,chapitre:ch,type,main,titre,consigne,critere,bpmCible:bpm,
     rythme:opts.r||"",requiert:opts.req||[],preset:Object.assign(base,opts.p||{})};
 }
@@ -859,13 +859,15 @@ function uid(){return "u"+Date.now().toString(36)+Math.random().toString(36).sli
 
 function carteNeuve(m){
   return Object.assign({},m,{statut:"neuf",ef:2.5,interval:0,due:null,reps:0,lapses:0,
-    bpmTravail:m.bpmCible,bpmRecord:0,rappels:0,dernierVu:null});
+    bpmTravail:m.bpmCible,bpmRecord:0,rappels:0,dernierVu:null,
+    mesurable:m.mesurable!==false});
 }
 function etatNeuf(){
-  return {version:2,dureeSeance:25,
+  return {version:3,dureeSeance:25,
     metro:{bpm:80,temps:4,sub:1,swing:false,repere:"accent24",gap:false,gapJouees:2,gapMuettes:2,
-           ramp:false,rampTous:8,rampPas:2,rampMax:140},
-    cartes:CORPUS.map(carteNeuve),journal:[],introJour:{date:null,n:0},calibration:{}};
+           ramp:false,rampTous:8,rampPas:2,rampMax:140,muet:false},
+    cartes:CORPUS.map(carteNeuve),journal:[],introJour:{date:null,n:0},calibration:{},
+    mesures:[]};
 }
 
 let S;
@@ -874,6 +876,13 @@ catch(e){ S=etatNeuf(); }
 
 /* migration v2.1 -> v2.2 : registre de calibration, indexé par appareil (§2.2) */
 if(!S.calibration || typeof S.calibration!=="object") S.calibration={};
+
+/* migration v2.2 -> v2.3 : journal des mesures (§11) et repère muet (§7.4).
+   La CLÉ de stockage reste "comping_v2" — c'est le SCHÉMA qui passe en 3.
+   Changer la clé viderait la progression enregistrée : ne pas « corriger ». */
+if(!Array.isArray(S.mesures)) S.mesures=[];
+if(S.metro && S.metro.muet===undefined) S.metro.muet=false;
+S.version=3;
 
 /* migration v2.0 -> v2.1 : le booléen jazz devient un repère à trois valeurs */
 (function migrerRepere(){
@@ -889,13 +898,46 @@ if(!S.calibration || typeof S.calibration!=="object") S.calibration={};
     const c=S.cartes.find(x=>x.id===m.id);
     c.chapitre=m.chapitre; c.requiert=m.requiert; c.type=m.type; c.main=m.main;
     c.titre=m.titre; c.consigne=m.consigne; c.critere=m.critere;
-    c.rythme=m.rythme; c.bpmCible=m.bpmCible;
+    c.rythme=m.rythme; c.bpmCible=m.bpmCible; c.mesurable=m.mesurable!==false;
     c.preset=Object.assign({},m.preset,{bpm:c.bpmTravail||m.preset.bpm});
     if(c.rappels===undefined) c.rappels=0;
     if(c.dernierVu===undefined) c.dernierVu=null;
     if(c.bpmTravail===undefined) c.bpmTravail=m.bpmCible;
   });
 })();
+
+/* ── journal des mesures (§11) ──────────────────────────────────────────────
+   Écrit hors du bloc pur : touche S. Le §10.7 point 4 fixe le sens de lecture
+   — l'historique est la liste des mesures ANTÉRIEURES, la plus récente en
+   dernier, et la mesure du jour n'y figure jamais. */
+const MAX_MESURES = 400;
+
+function historiqueDe(carteId){
+  return S.mesures.filter(m=>m.carte===carteId);
+}
+
+/* Purge du §11 : au-delà de 400 entrées, on élague par la plus ancienne, mais
+   JAMAIS la dernière d'un quadruplet — elle est le point d'origine de sa
+   série, et sans elle une condition abandonnée disparaîtrait de l'historique
+   sans laisser de trace. Si toutes les entrées restantes sont des points
+   d'origine, on cesse d'élaguer : le journal dépasse alors le plafond, ce qui
+   est le moindre mal. */
+function enregistrerMesure(m){
+  S.mesures.push(m);
+  while(S.mesures.length > MAX_MESURES){
+    let victime=-1;
+    for(let i=0;i<S.mesures.length && victime<0;i++){
+      for(let j=0;j<S.mesures.length;j++)
+        if(j!==i && memeQuadruplet(S.mesures[j].quadruplet, S.mesures[i].quadruplet)){
+          victime=i; break;
+        }
+    }
+    if(victime<0) break;
+    S.mesures.splice(victime,1);
+  }
+  sauver();
+  return m;
+}
 
 let differe=null;
 function sauver(){ clearTimeout(differe); differe=setTimeout(()=>{
@@ -1404,13 +1446,79 @@ function echelonDepart(bpm){
   return bpm <= 76 ? 0 : 1;
 }
 
+/* §6.1 — libellé de subdivision depuis le facteur. Table INVERSE de
+   SUBDIVISIONS, CONSTRUITE depuis elle : deux tables écrites à la main
+   finiraient par diverger, et la divergence serait muette. */
+const LIBELLES_SUBDIVISION = (function(){
+  const t = {};
+  for(const nom in SUBDIVISIONS) t[SUBDIVISIONS[nom]] = nom;
+  return t;
+})();
+function libelleSubdivision(facteur){
+  const n = LIBELLES_SUBDIVISION[facteur];
+  return n === undefined ? null : n;
+}
+
+/* §6.2 — palier de comparabilité du tempo. bpmTravail est réécrit à CHAQUE
+   mouvement du curseur du métronome embarqué et dérive seul en mode
+   progressif : comparer les tempos à l'unité rendait l'égalité du quadruplet
+   pratiquement inatteignable, donc le plafond du §10.3 indéboulonnable et le
+   marqueur fantôme du §10.4 toujours absent — le §10 aurait fonctionné sans
+   jamais rien montrer. 4 bpm est déjà le pas de progression du §7.2 : aucune
+   grandeur nouvelle n'entre. C'est un PARTITIONNEMENT, donc une relation
+   d'équivalence ; une tolérance de ±2 bpm ne l'aurait pas été et aurait
+   produit des séries qui ne se ferment pas. */
+function palierTempo(bpm){
+  if(typeof bpm !== "number" || !isFinite(bpm)) return null;
+  return Math.round(bpm/4)*4;
+}
+
+/* §7.4 — l'échelon se LIT, il ne se stocke pas : `soutien` et `repere`
+   décrivaient la même réalité et auraient divergé au premier réglage manuel
+   du métronome.
+
+   L'ordre des tests n'est PAS commutatif. Le repère se lit AVANT la
+   subdivision, parce que le corpus contient des cartes réglées à sub:2 ET
+   repere:"seuls24" : les croches y sont réglées mais INAUDIBLES — clic() les
+   écarte avant d'émettre. Lire sub d'abord donnerait l'échelon 0, donc un
+   pas_clic en croches, pour une carte où l'on n'entend que 2 et 4. */
+function echelonDe(preset){
+  if(!preset) return null;
+  if(preset.muet) return 5;
+  if(preset.gap)  return 4;
+  if(preset.repere === "seuls24")  return 3;
+  if(preset.repere === "accent24") return 2;
+  if(preset.sub > 1) return 0;
+  return 1;
+}
+
+/* §6.1 — le quadruplet ne se lit pas tel quel sur la carte : aucun de ses
+   quatre termes n'est l'identité. null dès qu'un terme manque — jamais un
+   quadruplet partiel, qui ferait comparer en silence deux mesures qui ne le
+   sont pas, exactement ce que le §6 interdit. */
+function quadrupletDe(carte){
+  if(!carte || !carte.preset) return null;
+  const tempo = carte.bpmTravail;          // jamais bpmCible : la consigne
+  if(typeof tempo !== "number" || !isFinite(tempo)) return null;
+  const sub = libelleSubdivision(carte.preset.sub);
+  if(sub === null) return null;
+  const repere = carte.preset.repere;
+  if(typeof repere !== "string" || !repere) return null;
+  const soutien = echelonDe(carte.preset);
+  if(soutien === null) return null;
+  return {tempo:tempo, subdivision:sub, repere:repere, soutien:soutien};
+}
+
 /* §6 — deux mesures ne sont comparables que si leur quadruplet est
    identique. Un seul champ qui diffère ouvre une série distincte : c'est la
-   règle qui empêche l'historique de mentir quand une carte monte d'échelon. */
+   règle qui empêche l'historique de mentir quand une carte monte d'échelon.
+   Le tempo est comparé au PALIER depuis le 2026-07-28 (§6.2) ; les trois
+   autres termes restent comparés à l'identique. */
 function memeQuadruplet(a, b){
   if(!a || !b) return false;
-  return a.tempo === b.tempo
-      && a.subdivision === b.subdivision
+  const pa = palierTempo(a.tempo), pb = palierTempo(b.tempo);
+  if(pa === null || pb === null || pa !== pb) return false;
+  return a.subdivision === b.subdivision
       && a.repere === b.repere
       && a.soutien === b.soutien;
 }
