@@ -166,6 +166,10 @@ L'app **fonctionne**, mais :
 La note ne dépend jamais de la latence (§10), donc l'absence de calibration ne bloque pas
 le travail. Elle bloque seulement la lecture du placement en avant / en arrière.
 
+Le masquage est décidé par `biaisAffichable()` et **là seulement** (§10.4.2 point 5) :
+un second test « la calibration existe-t-elle ? » ailleurs dans le rendu finirait par
+répondre autrement que le premier.
+
 ### 2.5 Appariement par consensus — **[É]** imposé par le terrain du 2026-07-27
 
 **Le terrain.** Première calibration réelle : six refus consécutifs, dispersions
@@ -794,6 +798,38 @@ Le sens de lecture est celui du progrès, et c'est **le même que celui de la nu
 des boutons** (§10.7 point 5) : les deux montent vers la droite. Une seule direction à
 apprendre, pas deux.
 
+#### 10.4.2 Décisions d'implémentation — livrées le 2026-07-28 (étape 7d)
+
+1. **Les plages de la barre sont CONSTRUITES depuis les bornes du §10.2, pas réécrites.**
+   `rangRho` portait 4,5 %, 6 % et 8 % en clair ; la barre en aurait eu une seconde copie.
+   La divergence aurait été **muette et visible à la fois** : la note aurait dit « Bien » et
+   la barre aurait placé le trait dans « En progrès », sans que rien ne signale laquelle
+   des deux a tort. Une seule table, `RHO_RANGS`, lue par `rangRho` **et** par
+   `PLAGES_BARRE`. Même discipline que `LIBELLES_SUBDIVISION` (§6.1) et `GESTES_MIN`
+   (§8.1).
+2. **Un seul jeu de libellés, `LIBELLES_NOTE`**, servi aux quatre boutons (§10.7 point 7)
+   et aux quatre plages de la barre (§10.4). Deux jeux auraient dérivé, et l'élève aurait
+   lu deux mots différents pour un même rang, à dix centimètres d'écart.
+3. **Le pointillé « ton habitude » n'est pas un repère ajouté** : 6 % est **déjà** la
+   frontière En progrès / Bien du §10.2. C'est le même nombre vu deux fois, donc il n'y a
+   rien à tenir en accord — il est lu, lui aussi, dans `RHO_RANGS`.
+4. **La plage « Acquis » se ferme à `0`, pas à `−∞`**, et la plage « Débuts » s'ouvre au
+   bord de la barre : les deux extrémités se **calculent** par `positionBarre` au lieu de
+   s'écrire à la main. `positionBarre` borne déjà à [0, 1] ; c'est elle qui décide où est
+   un bord, pas le rendu.
+5. **Le masquage du biais (§2.3) se décide en UN seul endroit**, `biaisAffichable()`, qui
+   lit `calibrationCourante()`. Sans calibration : ni le biais, ni la question du §9.3 — et
+   le **motif écrit en clair**, jamais un champ vide ni un zéro. σ, % en cible, R et la
+   note restent affichés : la note ne dépend jamais de la latence (§10.1). Le point ouvert
+   **j** n'est pas clos pour autant : la règle est écrite et tient en un seul endroit, mais
+   `biaisAffichable()` n'aura d'appelant qu'à l'étape **7e**. Dire « soldé » ici aurait
+   reproduit exactement le défaut que **j** signale.
+6. **La barre ne s'anime pas** sous `prefers-reduced-motion` : la règle globale de la
+   feuille de style (`*{transition:none}`) couvre déjà le marqueur, aucune exception à
+   écrire.
+
+---
+
 ### 10.5 Le cas non concluant n'est pas une mauvaise note
 
 Distinction à ne pas rater à l'implémentation. « Débuts » signifie *représenter tout de
@@ -1033,6 +1069,15 @@ branchement et rouges jusqu'à ce que le code existe (§13, règle inchangée) :
    pure ; le rendu ne l'est pas. Le masquage solde le point ouvert **j** :
    `calibrationCourante()` est exposée depuis le 2026-07-27 et n'a toujours aucun appelant.
    Seul morceau qui touche vraiment l'écran.
+
+   **7e — branchement (plomberie).** Étape **ajoutée le 2026-07-28**, à l'écriture de 7d :
+   7a, 7c et 7d déposent chacun des pièces qui n'ont **aucun appelant** —
+   `enregistrerMesure`, `historiqueDe`, `cycleMesure`, `rendreBarre`. C'est le même défaut
+   que le point ouvert **j** reprochait à `calibrationCourante()`, et le nommer vaut mieux
+   que le laisser se répéter. 7e est ce qui les relie : file d'ordonnancement du Moteur
+   (§8.2 point 1) → `cycleMesure` → `stats` → `concluante` → `noteProposee` → barre et
+   note pré-cochée → `enregistrerMesure`. Rien de neuf à décider : que du câblage, et il
+   ne se teste pas sous Node.
 
 ---
 
