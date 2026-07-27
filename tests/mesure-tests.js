@@ -30,7 +30,12 @@ const path = require("path");
          · intensite_db = MAXIMUM du groupe, PAS celle du chef.
 
    pasGrille(bpm, subdivision)        → s   (subdivision : 1 noires, 2 croches…)
-   pasClic(bpm, echelon, tempsParMesure) → s | null   (§7, null aux échelons 4 et 5)
+   pasClic(bpm, echelon, tempsParMesure, subdivision) → s | null
+       §7.3. Renvoie null aux échelons 4 et 5 ; à l'échelon 0 quand la
+       subdivision manque (plus de défaut silencieux — il était faux pour
+       ar-triolets et ar-doubles, qui démarrent tous deux à l'échelon 0) ;
+       et à l'échelon 3 dès 5 temps par mesure, où les clics sur 2 et 4 ne
+       sont plus équidistants.
    fen(pasGrilleMs, opts)             → ms  opts {FEN_RELATIVE, COEF_FEN, PLANCHER_FEN}
    stats(gestes, {ancre_s, pas_grille_s})
        → {n, R, p, biais_ms, sigma_grille_ms, sigma_locale_ms, rho, pct_cible}
@@ -141,8 +146,8 @@ test("T2d · plafond d'étalement à 2,5 × fusion : au-delà, le geste se refer
    §13 test 3 : ancre et pas_grille inchangés, pas_clic seul modifié.       */
 test("T3 · montée d'échelon : pas_grille et ancre inchangés, pas_clic seul bouge", () => {
   const bpm = 90, sub = 2, tpm = 4, ancre = 12.3456;
-  const pg0 = M.pasGrille(bpm, sub), pc0 = M.pasClic(bpm, 0, tpm);
-  const pg1 = M.pasGrille(bpm, sub), pc1 = M.pasClic(bpm, 1, tpm);
+  const pg0 = M.pasGrille(bpm, sub), pc0 = M.pasClic(bpm, 0, tpm, sub);
+  const pg1 = M.pasGrille(bpm, sub), pc1 = M.pasClic(bpm, 1, tpm, sub);
   proche(pg1, pg0, 1e-12, "pas_grille :");
   proche(pg0, 1 / 3, 1e-9, "croches à 90 bpm = 333 ms :");
   proche(pc0, pg0, 1e-12, "échelon 0 : le clic suit la grille :");
@@ -157,6 +162,21 @@ test("T3b · échelons 4 et 5 : plus de clic, la grille reste", () => {
 });
 test("T3c · échelon 3 (2 et 4 seuls) : pas_clic à la blanche", () => {
   proche(M.pasClic(90, 3, 4), 2 * 60 / 90, 1e-12);
+});
+test("T3d · §7.3 — échelon 0 sans subdivision : null, jamais un défaut", () => {
+  egal(M.pasClic(60, 0, 4), null, "subdivision absente :");
+  proche(M.pasClic(60, 0, 4, 3), M.pasGrille(60, 3), 1e-12, "triolets (ar-triolets) :");
+  proche(M.pasClic(60, 0, 4, 4), M.pasGrille(60, 4), 1e-12, "doubles (ar-doubles) :");
+  proche(M.pasClic(90, 0, 4, 2), M.pasGrille(90, 2), 1e-12, "croches :");
+});
+test("T3e · §7.3 — échelon 3 : le pas dépend du nombre de temps, pas du seul 4/4", () => {
+  const noire = 60 / 90;
+  egal(M.pasClic(90, 3, 1), null, "1 temps — le temps 2 n'existe pas :");
+  proche(M.pasClic(90, 3, 2), 2 * noire, 1e-12, "2/4 — un clic par mesure :");
+  proche(M.pasClic(90, 3, 3), 3 * noire, 1e-12, "3/4 (scarborough) — un clic par mesure :");
+  proche(M.pasClic(90, 3, 4), 2 * noire, 1e-12, "4/4 — deux clics équidistants :");
+  egal(M.pasClic(90, 3, 5), null, "5/4 — intervalles 2 puis 3 :");
+  egal(M.pasClic(90, 3, 6), null, "6/8 — intervalles 2 puis 4 :");
 });
 
 /* ═══ T4 — cohérence FEN / σ ════════════════════════════════════════════════
