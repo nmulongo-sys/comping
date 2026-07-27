@@ -44,7 +44,7 @@ const EXPORTES = [
   "regrouper", "stats", "concluante", "noteProposee", "serieAcquise",
   "rangRho", "rangCible", "NOTES", "RHO_ACQUIS",
   "pasGrille", "pasClic", "fen", "echelonDepart", "memeQuadruplet",
-  "facteurSubdivision", "SUBDIVISIONS",
+  "facteurSubdivision", "SUBDIVISIONS", "libelleSubdivision", "LIBELLES_SUBDIVISION",
   "FEN_RELATIVE", "COEF_FEN", "PLANCHER_FEN", "FEN_FIXE_MS"
 ];
 
