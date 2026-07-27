@@ -70,37 +70,80 @@ test("l'écart interquartile encaisse un clic aberrant, l'écart-type non", () =
 test("appariement — une détection ne sert qu'une fois", () => {
   const prog = [1.0, 2.0, 3.0];
   const det = [1.187, 2.190, 3.185];
-  const p = M.apparier(prog, det);
-  egal(p.length, 3, "trois clics appariés :");
-  proche(p[0].delta_ms, 187, 0.001, "δ₀ :");
-  proche(p[2].delta_ms, 185, 0.001, "δ₂ :");
+  const a = M.apparier(prog, det);
+  egal(a.paires.length, 3, "trois clics appariés :");
+  proche(a.paires[0].delta_ms, 187, 0.001, "δ₀ :");
+  proche(a.paires[2].delta_ms, 185, 0.001, "δ₂ :");
+  egal(a.support, 3, "les trois clics portent le consensus :");
 });
 test("résonance : les redéclenchements du même clic sont ignorés", () => {
   // Un clic au haut-parleur produit souvent 2 ou 3 détections (point ouvert f,
-  // tranché : redéclenchement sur la résonance, pas balayage). Seule la
-  // première est l'attaque ; les suivantes ne doivent pas devenir des clics.
+  // tranché : redéclenchement sur la résonance, pas balayage). L'attaque est
+  // la détection la plus proche du consensus — ici la première, les
+  // redéclenchements arrivant après elle.
   const prog = [1.0, 2.0];
   const det = [1.187, 1.252, 1.310, 2.190, 2.249];
-  const p = M.apparier(prog, det);
-  egal(p.length, 2, "deux clics, pas cinq :");
-  proche(p[0].t_det, 1.187, 1e-9, "la première détection l'emporte :");
-  proche(p[1].t_det, 2.190, 1e-9);
+  const a = M.apparier(prog, det);
+  egal(a.paires.length, 2, "deux clics, pas cinq :");
+  proche(a.paires[0].t_det, 1.187, 1e-9, "l'attaque l'emporte sur sa résonance :");
+  proche(a.paires[1].t_det, 2.190, 1e-9);
 });
 test("clic manqué : le suivant ne se décale pas d'un cran", () => {
   const prog = [1.0, 2.0, 3.0];
   const det = [1.187, 3.185];               // le clic 2 n'a pas été entendu
-  const p = M.apparier(prog, det);
-  egal(p.length, 2, "deux appariements :");
-  egal(p[1].k, 2, "la détection tardive va bien au clic 3, pas au clic 2 :");
-  proche(p[1].delta_ms, 185, 0.001);
+  const a = M.apparier(prog, det);
+  egal(a.paires.length, 2, "deux appariements :");
+  egal(a.paires[1].k, 2, "la détection tardive va bien au clic 3, pas au clic 2 :");
+  proche(a.paires[1].delta_ms, 185, 0.001);
 });
 test("hors fenêtre : une détection très en retard n'est pas appariée", () => {
-  const p = M.apparier([1.0], [1.700]);     // 700 ms, au-delà des 500 ms admis
-  egal(p.length, 0);
+  const a = M.apparier([1.0], [1.700]);     // 700 ms, au-delà des 500 ms admis
+  egal(a.paires.length, 0);
+  egal(a.consensus_ms, null, "pas de candidat, pas de consensus :");
 });
 test("une détection légèrement en avance reste admise (jusqu'à 50 ms)", () => {
-  egal(M.apparier([1.0], [0.970]).length, 1, "−30 ms :");
-  egal(M.apparier([1.0], [0.930]).length, 0, "−70 ms :");
+  egal(M.apparier([1.0], [0.970]).paires.length, 1, "−30 ms :");
+  egal(M.apparier([1.0], [0.930]).paires.length, 0, "−70 ms :");
+});
+test("§2.5 · consensus — un bruit AVANT l'arrivée du clic ne vole plus l'appariement", () => {
+  // Le cas qui a causé six refus : la première détection de la fenêtre est
+  // un bruit, la vraie arrivée est à +200 ms. L'appariement glouton prenait
+  // le bruit ; le consensus prend ce sur quoi les clics s'accordent.
+  const prog = [10.0, 11.0, 12.0];
+  const det = [9.970, 10.200, 11.200, 11.960, 12.200];
+  const a = M.apparier(prog, det);
+  proche(a.consensus_ms, 200, 0.001, "consensus :");
+  egal(a.support, 3);
+  egal(a.paires.length, 3, "les trois clics appariés :");
+  for (const p of a.paires) proche(p.delta_ms, 200, 0.001, "clic " + p.k + " :");
+});
+test("§2.5 · un clic dont l'arrivée est masquée reste non apparié, sans fausser les autres", () => {
+  const prog = [10.0, 11.0, 12.0];
+  const det = [10.200, 11.155, 12.200];     // clic 1 : bruit à +155, arrivée avalée
+  const a = M.apparier(prog, det);
+  egal(a.paires.length, 2, "deux appariés :");
+  egal(a.paires[0].k, 0); egal(a.paires[1].k, 2);
+  proche(a.consensus_ms, 200, 0.001, "le bruit à +155 ne déplace pas le consensus :");
+});
+test("§2.5 · fixture terrain — la session refusée du 27 devient acceptable", () => {
+  // Sixième refus : 136 détections brutes, IQR glouton 193,8 ms. Dessous,
+  // 21 clics à +197…+203 ms. Le consensus doit les retrouver, et le verdict
+  // du §2.1 point 5, inchangé, doit accepter.
+  const f = JSON.parse(fs.readFileSync(
+    path.join(__dirname, "fixtures", "calibration-2026-07-27-refus.json"), "utf8"));
+  const a = M.apparier(f.programmes_s, f.detections_s);
+  proche(a.consensus_ms, f.attendu_consensus.consensus_ms, 0.6, "consensus :");
+  egal(a.support, f.attendu_consensus.support, "support :");
+  egal(a.paires.length, f.attendu_consensus.apparies, "appariés :");
+  const sans = [];
+  const vus = new Set(a.paires.map(p => p.k));
+  for (let k = 0; k < f.n_clics; k++) if (!vus.has(k)) sans.push(k);
+  egal(JSON.stringify(sans), JSON.stringify(f.attendu_consensus.non_apparies),
+    "clics masqués par le réfractaire :");
+  const v = M.verdictCalibration(a.paires.map(p => p.delta_ms));
+  egal(v.ok, true, "verdict :");
+  proche(v.latence_ms, f.attendu_consensus.latence_ms, 0.6, "latence :");
+  proche(v.dispersion_ms, f.attendu_consensus.dispersion_ms, 0.6, "dispersion :");
 });
 
 /* ═══ verdict et conditions de rejet (§2.1 point 5) ════════════════════════ */
@@ -178,6 +221,7 @@ test("test 9 · la calibration émet le clic de travail, pas un autre timbre", (
 });
 test("test 9 · les deux paramètres du §3.0 sont distincts et non exposés", () => {
   vrai(/const ECART_MIN_MS\s*=\s*55/.test(HTML), "réfractaire du détecteur :");
+  vrai(/MIN_IOI_MS:30/.test(HTML), "réfractaire abaissé à 30 ms pendant la calibration (§2.5) :");
   vrai(/const FUSION_MS\s*=\s*120/.test(HTML), "regroupement en gestes :");
   const htmlSeul = HTML.split("<script>")[0];
   vrai(!/ecart_min|fusion_ms|ECART_MIN|FUSION_MS/i.test(htmlSeul),
