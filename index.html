@@ -1215,27 +1215,60 @@ function interquartile(v){
   return quantile(v,0.75)-quantile(v,0.25);
 }
 
-/* Appariement clic programmé → clic entendu. Une détection ne sert qu'une
-   fois : la résonance du haut-parleur en produit souvent deux ou trois par
-   clic, seule la première compte — les suivantes ne sont pas des attaques,
-   c'est le même son qui redéclenche (§ point ouvert f). */
+/* Appariement clic programmé → clic entendu, par CONSENSUS (§2.5).
+   La règle « première détection de la fenêtre » visait la résonance, qui
+   suit l'attaque (point ouvert f) ; elle était sans défense contre un bruit
+   ambiant qui la précède — six refus de terrain le 2026-07-27, 136
+   détections pour 24 clics, alors que la boucle donnait 200 ms à ±3 ms.
+   Le retard retenu est celui sur lequel les clics S'ACCORDENT :
+     1. candidats de chaque clic dans [t−avant, t+apres] ;
+     2. consensus = retard de support maximal (nb de clics ayant un candidat
+        à ±10 ms) ; à égalité, le plus petit — un clic seul retombe donc sur
+        sa première détection, sémantique du point f conservée ;
+     3. chaque clic prend sa détection la plus proche du consensus, à
+        ±20 ms, une détection ne servant toujours qu'une fois ;
+     4. sans candidat dans ce rayon, le clic reste non apparié.
+   Renvoie {paires, consensus_ms, support}. */
 function apparier(programmes, detections, opts){
   const o = opts||{}, avant = o.avant===undefined?0.05:o.avant,
-        apres = o.apres===undefined?0.5:o.apres;
-  const libres = detections.slice().sort((a,b)=>a-b);
-  const pris = new Array(libres.length).fill(false), paires=[];
-  for(let k=0;k<programmes.length;k++){
-    const t=programmes[k];
-    for(let i=0;i<libres.length;i++){
-      if(pris[i]) continue;
-      if(libres[i] < t-avant) continue;
-      if(libres[i] > t+apres) break;
-      pris[i]=true;
-      paires.push({k:k, t_prog:t, t_det:libres[i], delta_ms:(libres[i]-t)*1000});
-      break;
+        apres = o.apres===undefined?0.5:o.apres,
+        rayonConsensus = o.rayonConsensus===undefined?10:o.rayonConsensus,
+        rayonAppariement = o.rayonAppariement===undefined?20:o.rayonAppariement;
+  const tri = detections.slice().sort((a,b)=>a-b);
+  const cand = programmes.map(t =>
+    tri.filter(d => d >= t-avant && d <= t+apres).map(d => (d-t)*1000));
+  let consensus=null, support=0;
+  const tous=[];
+  cand.forEach(c => c.forEach(d => tous.push(d)));
+  tous.sort((a,b)=>a-b);
+  for(let j=0;j<tous.length;j++){
+    const d=tous[j];
+    let s=0;
+    for(let i=0;i<cand.length;i++){
+      const c=cand[i];
+      for(let m=0;m<c.length;m++){ if(Math.abs(c[m]-d)<=rayonConsensus){ s++; break; } }
+    }
+    if(s>support){ support=s; consensus=d; }  // parcours croissant : à égalité, le plus petit tient
+  }
+  const pris = new Array(tri.length).fill(false), paires=[];
+  if(consensus!==null){
+    for(let k=0;k<programmes.length;k++){
+      const t=programmes[k];
+      let iMieux=-1, eMieux=Infinity;
+      for(let i=0;i<tri.length;i++){
+        if(pris[i]) continue;
+        if(tri[i] < t-avant) continue;
+        if(tri[i] > t+apres) break;
+        const e=Math.abs((tri[i]-t)*1000-consensus);
+        if(e<eMieux){ eMieux=e; iMieux=i; }
+      }
+      if(iMieux>=0 && eMieux<=rayonAppariement){
+        pris[iMieux]=true;
+        paires.push({k:k, t_prog:t, t_det:tri[iMieux], delta_ms:(tri[iMieux]-t)*1000});
+      }
     }
   }
-  return paires;
+  return {paires:paires, consensus_ms:consensus, support:support};
 }
 
 /* §2.1 point 5 — rejet en deçà de 20 clics ou au-delà de 15 ms d'écart
@@ -1376,7 +1409,8 @@ function memeQuadruplet(a, b){
 const Detecteur = {
   flux:null, source:null, node:null, onsets:[], actif:false, moduleCharge:false,
 
-  async demarrer(){
+  async demarrer(opts){
+    const o = opts||{};
     initAudio();
     this.flux = await navigator.mediaDevices.getUserMedia({audio:{
       echoCancellation:false, noiseSuppression:false, autoGainControl:false}});
@@ -1390,7 +1424,8 @@ const Detecteur = {
     this.source=ctx.createMediaStreamSource(this.flux);
     this.node=new AudioWorkletNode(ctx,"detecteur-attaque",{
       numberOfInputs:1, numberOfOutputs:0, channelCount:1,
-      processorOptions:{N:1024, HOP:256, sens:SENS_DETECTION, minIOI:ECART_MIN_MS/1000}});
+      processorOptions:{N:1024, HOP:256, sens:SENS_DETECTION,
+        minIOI:(o.minIOI_ms===undefined?ECART_MIN_MS:o.minIOI_ms)/1000}});
     this.onsets=[];
     this.node.port.onmessage=e=>{
       const d=e.data;
@@ -1412,6 +1447,7 @@ const Detecteur = {
 
 const Calibration = {
   N_CLICS:24, INTERVALLE:1.0, AMORCE:1.2, QUEUE:1.0,
+  MIN_IOI_MS:30,   // §2.5 — réfractaire abaissé pendant la calibration seule
   en_cours:false, programmes:[], suivi:null, fin:null, detail:null,
 
   ouvrir(){
@@ -1445,7 +1481,7 @@ const Calibration = {
     $("#calib-lancer").hidden=true;
     $("#calib-mesure").hidden=false;
     try{
-      await Detecteur.demarrer();
+      await Detecteur.demarrer({minIOI_ms:this.MIN_IOI_MS});
     }catch(err){
       this.en_cours=false;
       this.afficherRejet("Micro indisponible : "+((err&&err.message)||err)+
@@ -1483,9 +1519,9 @@ const Calibration = {
     Detecteur.arreter(); libererVeille();
     this.en_cours=false;
 
-    const paires=apparier(this.programmes,detections);
-    const v=verdictCalibration(paires.map(p=>p.delta_ms));
-    this.detailler(detections,paires);
+    const ap=apparier(this.programmes,detections);
+    const v=verdictCalibration(ap.paires.map(p=>p.delta_ms));
+    this.detailler(detections,ap);
     if(!v.ok){ this.afficherRejet(v.texte); return; }
 
     S.calibration[empreinteAppareil()]={
@@ -1511,15 +1547,20 @@ const Calibration = {
      détections brutes — un excès de détections désigne la résonance, un
      éparpillement uniforme désigne autre chose. Aucune valeur n'est
      enregistrée pour autant : le §2.1 point 5 reste tenu. */
-  detailler(detections,paires){
+  detailler(detections,ap){
     const t0=this.programmes[0];
-    const dl=paires.map(p=>Math.round(p.delta_ms));
+    const dl=ap.paires.map(p=>Math.round(p.delta_ms));
     const brut=detections.map(t=>Math.round((t-t0)*1000));
     const med=mediane(dl), iqr=interquartile(dl);
+    const vus=new Set(ap.paires.map(p=>p.k)), sans=[];
+    for(let k=0;k<this.N_CLICS;k++) if(!vus.has(k)) sans.push(k);
     this.detail=[
       "clics programmés : "+this.N_CLICS+" à "+Math.round(this.INTERVALLE*1000)+" ms",
       "détections brutes : "+detections.length,
-      "clics appariés : "+paires.length,
+      "consensus : "+(ap.consensus_ms===null?"aucun":arrondi1(ap.consensus_ms)+" ms, porté par "+
+        ap.support+" clic"+(ap.support>1?"s":"")),
+      "clics appariés : "+ap.paires.length+
+        (sans.length?" · non appariés : "+sans.join(" "):""),
       "médiane "+(med===null?"—":arrondi1(med))+" ms · interquartile "+
         (iqr===null?"—":arrondi1(iqr))+" ms",
       "",
