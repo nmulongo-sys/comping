@@ -624,6 +624,39 @@ le seuil de concluance du §9.1 sont **le même nombre** ; écrit à deux endroi
 deux finirait par bouger seul. Même discipline que `serieAcquise`, compteur unique du
 §10.3 et du §7.2.
 
+### 8.2 Décisions d'implémentation — livrées le 2026-07-28 (étape 7c)
+
+1. **Les évènements `clic` viennent de la file d'ordonnancement, jamais de `Moteur.clic()`.**
+   À `repere:"seuls24"`, le temps 1 **ne sonne pas** : `clic()` écarte tout ce qui n'est pas
+   2 ou 4 avant d'émettre. Compter les clics *audibles* ferait que l'ancre ne se poserait
+   **jamais** sur ces cartes — et sans erreur visible : la carte resterait en décompte
+   indéfiniment. `Moteur.file` porte **toute** position, y compris les mesures muettes du
+   mode gap, et c'est la seule source correcte. Même famille de piège que le §7.4 : ce qui
+   s'entend et ce qui se joue ne sont pas la même chose.
+2. **Le décompte se compte depuis `mesure0`**, indice de la première mesure dont le temps 1
+   est vu, et la comparaison est `evt.mesure − mesure0 >= MESURES_DECOMPTE`, **pas `===`**.
+   Le Moteur tourne déjà quand la carte s'ouvre : le premier clic reçu peut tomber au
+   3ᵉ temps, et compter à partir de lui donnerait moins de deux mesures de décompte
+   (test 14b). Le `>=` est un garde-fou : si un temps 1 se perd, l'ancre se pose une mesure
+   trop tard — avec `===` elle ne se poserait plus du tout, et l'attente ne produirait
+   aucune erreur.
+3. **`etat.gestes` porte des objets `{temps_s}`**, la forme que `stats()` attend déjà.
+   Aucune couche d'adaptation entre le cycle et la statistique : une conversion de plus est
+   une divergence de plus.
+4. **`fin = ancre + DUREE_MESURE_S`, posé à l'ancre.** `{type:"arret"}` ne porte pas de
+   temps : `fin` ne peut donc pas être l'instant d'arrêt réel. C'est la fin **prévue** de la
+   fenêtre — celle dont le décompte à l'écran a besoin, et elle est connue dès l'ancre.
+5. **Bornes inclusives** : un geste est retenu si `ancre <= t <= fin` ; l'horloge ferme la
+   mesure dès `t − ancre >= DUREE_MESURE_S`. À l'instant exact de la frontière, les deux
+   sont vraies ; l'ordre d'arrivée tranche, et l'écart porté est d'un geste au plus.
+6. **`presentation` n'écoute que `demarrer`.** Fermer la carte avant le départ ne passe pas
+   par le cycle : c'est de la plomberie, et le cycle n'a rien à en dire.
+7. **`arret` pendant le décompte → `abandon`, motif `"gestes"`** : zéro geste collecté, la
+   règle du §8.1 s'applique sans cas particulier.
+8. **`bilan` et `abandon` sont terminaux.** Aucun évènement n'en sort. Reprendre une mesure,
+   c'est repartir de `cycleInitial()` — il n'y a pas de retour en arrière à écrire, donc
+   pas de retour en arrière à tester.
+
 ---
 
 ## 9. Statistiques et conditions d'affichage
@@ -632,7 +665,7 @@ deux finirait par bouger seul. Même discipline que `serieAcquise`, compteur uni
 
 | Condition | Seuil | Statut |
 |---|---|---|
-| Nombre de gestes du passage retenu | ≥ 24 | **[P]** |
+| Nombre de gestes du passage retenu | ≥ `GESTES_MIN` (24) | **[P]** — lu depuis la constante du §8.1 depuis le 2026-07-28, plus écrit en clair |
 | Test de Rayleigh | p < 0,001 | **[É]** (déjà en place v1.3+) |
 | Accroche | R > 0,25 | **[É]** |
 | Écart du tempo joué au tempo réglé | ≤ 3 % | **[É]** — garde-fou du protocole. Au-delà, B4/B5 montrent 5 à 7 tours de phase sur 30 s : l'accroche s'effondre mécaniquement et la mesure ne dit plus rien du jeu. |
