@@ -1,5 +1,20 @@
 # comping — spécification du moteur de mesure intégré
 
+> Version 0.12 — 2026-07-28. Étape **7d** livrée : la géométrie de la barre (§10.4.1) est
+> pure et testée, et le §10.4.2 acte que ses quatre plages sont **construites** depuis les
+> bornes du §10.2 (`RHO_RANGS`) au lieu d'en être une seconde copie — la note aurait dit
+> « Bien » et la barre aurait placé le trait dans « En progrès », sans que rien ne dise
+> laquelle a tort. Un seul jeu de libellés pour les boutons et les plages. Le masquage du
+> biais (§2.3) tient en un endroit, `biaisAffichable()` — mais le point ouvert **j** n'est
+> **pas** clos : la fonction n'aura d'appelant qu'à 7e. Le §14 gagne une étape **7e —
+> branchement** : 7a, 7c et 7d déposent chacune des pièces sans appelant, et le nommer vaut
+> mieux que le laisser se répéter.
+> Version 0.11 — 2026-07-28. Étape **7c** livrée : le cycle du §8 est écrit en réducteur
+> pur et le §8.2 en consigne les huit décisions. La première commande la plomberie : les
+> évènements `clic` viennent de la **file d'ordonnancement**, jamais de `Moteur.clic()` — à
+> `repere:"seuls24"` le temps 1 ne sonne pas, et l'ancre ne se serait **jamais** posée sur
+> ces cartes, sans erreur visible. Le décompte se compte depuis le premier temps 1 **vu**,
+> avec `>=` et non `===`. `GESTES_MIN` remplace le `24` en clair de `concluante` (§9.1).
 > Version 0.10 — 2026-07-28. Fondations de l'étape 7, posées après lecture du code :
 > quatre manques relevés dans `index.html`, tranchés ici. Le quadruplet ne se lit pas tel
 > quel sur la carte — §6.1 en donne la dérivation —, et la comparabilité passe au **palier
