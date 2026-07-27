@@ -7,10 +7,10 @@
    l'exécution, comme tests/calibration-tests.js le fait pour la calibration.
    Une copie dériverait sans prévenir ; un extrait ne le peut pas.
 
-   Sont extraites à ce jour les fonctions des étapes 2, 3 et 4 du §14.
-   noteProposee (étape 5) n'est pas encore écrite : les tests qui l'appellent
-   échouent, et c'est le comportement attendu tant que le code n'existe
-   pas (§13).
+   Sont extraites à ce jour les fonctions des étapes 2 à 5 du §14, note
+   proposée comprise (§10, livrée le 2026-07-28). Toute fonction ajoutée au
+   bloc d'index.html doit être ajoutée ici pour être visible des tests : la
+   liste ci-dessous est la seule frontière.
    ═══════════════════════════════════════════════════════════════════════════ */
 
 const fs = require("fs");
@@ -33,7 +33,8 @@ if (i0 < 0 || i1 < 0 || i1 < i0) {
 }
 
 const EXPORTES = [
-  "regrouper", "stats", "concluante",
+  "regrouper", "stats", "concluante", "noteProposee", "serieAcquise",
+  "rangRho", "rangCible", "NOTES", "RHO_ACQUIS",
   "pasGrille", "pasClic", "fen", "echelonDepart", "memeQuadruplet",
   "facteurSubdivision", "SUBDIVISIONS",
   "FEN_RELATIVE", "COEF_FEN", "PLANCHER_FEN", "FEN_FIXE_MS"
