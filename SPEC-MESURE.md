@@ -1,5 +1,8 @@
 # comping — spécification du moteur de mesure intégré
 
+> Version 0.6 — 2026-07-27. Capture complète versionnée : test 2 recadré sur une
+> référence reproductible, point ouvert g instruit et rouvert autrement, point ouvert k
+> sur la sous-détection, §16 corrigé.
 > Version 0.5 — 2026-07-27. Étape 1 livrée (calibration + worklet), §2.4 consignant
 > les trois décisions d'implémentation, §4.4 sur l'ambiguïté σ_locale / σ de phase,
 > points ouverts g à j, §16 sur la consolidation du développement.
@@ -161,6 +164,32 @@ nouveau geste  si   t − geste.tFin > fusion_ms      // écart à la DERNIÈRE 
 - son intensité est le **maximum** du groupe, **jamais celle du chef** — divergent sur 15
   des 52 gestes de la séance libre du 27, soit 29 % ;
 - son étalement est `tFin − t`.
+
+### 3.1 Ce que la capture du 27 dit de `fusion_ms` — **[É]**
+
+Balayage de 120 à 800 ms sur les 13 prises propres, gestes comparés au nombre d'attaques
+réellement jouées, fenêtre utile seule :
+
+| `fusion_ms` | écart moyen au nombre attendu | prises à ±10 % |
+|---|---|---|
+| 120 ms | +41,6 % | 0 / 13 |
+| 200 ms | +29,3 % | 3 / 13 |
+| 300 ms | +26,3 % | 4 / 13 |
+| 500 ms | +31,9 % | 6 / 13 |
+| 800 ms | +53,6 % | 0 / 13 |
+
+**Aucune valeur ne convient, et l'optimum apparent est un artefact.** Les erreurs sont de
+signes opposés selon la série : en A — une attaque par seconde, corde à vide — 116
+détections brutes pour 48 attaques, sur-détection par résonance, que le regroupement
+corrige ; en B et C — jeu plus rapide, nuancé — B5 ne produit que 84 détections brutes pour
+120 attaques, **sous-détection, que le regroupement ne peut pas corriger** : on ne regroupe
+pas ce qui n'a pas été détecté. Le minimum vers 300 ms compense l'une par l'autre sur des
+prises différentes, et détruit au passage de vraies attaques rapprochées.
+
+Conséquence pour la note : à 120 ms, la série A porte environ **+33 % de gestes parasites**,
+chacun injectant un intervalle court dans `σ_locale`. **ρ est donc surestimé aujourd'hui**,
+et ρ est la seule entrée de la table du §10.2. La valeur reste figée à 120 ms faute de
+mieux, mais elle n'est pas justifiée — points ouverts **g** et **k**.
 
 Trois changements, et trois seulement :
 
@@ -539,7 +568,7 @@ une par quadruplet, conservée comme point d'origine **[P]**.
 | # | Test | Attendu |
 |---|---|---|
 | 1 | Worklet headless sur signal synthétique, 5 tirages × 16 attaques, bruit −60 à −38 dB | 79/80 détectées minimum, σ ≤ 7 ms |
-| 2 | Rejeu des 293 détections réelles d'`analyse-attaque` | **162 gestes** (référence inscrite dans le source v1.5) avec `fusion_ms = 120` |
+| 2 | Rejeu de `tests/fixtures/protocole-2026-07-27-03-17-23.json` | **1913 détections → 987 gestes** à `fusion_ms = 120`, et le détail des 14 prises. La référence « 293 → 162 » du commentaire de `regrouper()` est **irréproductible** : aucun sous-ensemble de la capture ni de la séance libre ne la donne, le jeu de données d'origine est perdu. |
 | 3 | Grille : changement d'échelon de soutien en cours de carte | ancre et `pas_grille` inchangés, `pas_clic` seul modifié |
 | 4 | Cohérence FEN/σ : jeu synthétique à ρ = 6 % | % en cible dans [64 %, 72 %] |
 | 5 | Mesure à tempo dérivant de 5 % | rejetée, motif « tempo », aucune note proposée |
@@ -575,7 +604,8 @@ une par quadruplet, conservée comme point d'origine **[P]**.
 | c | Vérification d'accord par chromagramme 8192 | point ouvert 6, spécifiée ailleurs |
 | d | Ratio de swing dans `recalculer()` | chapitres 9–11, hors périmètre |
 | e | Habillage de timbre | conditionné à une prise vérifiant σ insensible au timbre |
-| g | Justification de `fusion_ms = 120` | à refaire contre ρ, pas contre R (§3.0) : le balayage 30–600 ms n'a testé que l'invariance de l'accroche |
+| g | Justification de `fusion_ms = 120` | **instruit, non clos** — voir §3.1. Ne peut pas se faire par comparaison au nombre d'attaques attendues ; à reprendre contre ρ, sur les seules prises où la détection est saine |
+| k | Sensibilité de 2,5 trop haute pour le jeu rapide et nuancé | B5 : 84 détections brutes pour 120 attaques jouées. La sous-détection ne se corrige par aucun regroupement. Conditionne la validité de toute mesure hors corde à vide |
 | h | Première calibration réelle | aucune valeur de terrain à ce jour. À relever : nombre de clics entendus sur 24, et ordre de grandeur de la latence — sous 20 ms, le micro capte par le boîtier et non par l'air |
 | i | σ de phase contre σ_locale (§4.4) | conditionne la colonne « % en cible » du §10.2 |
 | j | Consommateurs du §2.3 | `calibrationCourante()` est exposée, rien ne l'appelle encore : le masquage du biais arrive à l'étape 5 |
@@ -593,11 +623,18 @@ entre-temps.
 
 Ce que la consolidation exige, et qui n'est pas encore en place :
 
-- le `README.md` d'`analyse-attaque` **après fusion** (base `b34a008` + apports de l'autre
-  session, deux affirmations périmées corrigées) ;
-- `CDC-PROTOCOLE-V2.md` (`b342010`), cahier des charges v2 de la page de capture ;
-- `protocole-2026-07-27-03-17-23.json`, sans lequel le test 2 ne peut pas vérifier
-  les 293 détections → 162 gestes.
+**Corrigé le 2026-07-27 : les trois pièces sont en place.** Le `README.md` fusionné
+(43 498 o) et `CDC-PROTOCOLE-V2.md` (10 713 o) étaient déjà dans `analyse-attaque` ; la
+capture complète du protocole a été versée dans `comping/tests/fixtures/` (`9e55357`,
+239 821 o, 14 prises, 1913 détections).
 
-Tant que ces trois pièces manquent, une session travaillant depuis ce seul dépôt reste
-exposée à la divergence qui vient de se produire.
+Inventaire vérifié par l'API le 2026-07-27 :
+
+- **`comping`** : `index.html`, `SPEC-MESURE.md`, `README.md`, `tests/mesure-tests.js`,
+  `tests/calibration-tests.js`, `tests/fixtures/` (séance libre + protocole).
+- **`analyse-attaque`** : `index.html` v1.5, `README.md`, `PROTOCOLE.md`,
+  `CDC-PROTOCOLE-V2.md`, `protocole.html`.
+
+Aucun fichier du moteur ne vit désormais ailleurs que dans les dépôts. **Une session
+ne doit plus travailler sur une copie** : elle lit le dépôt par l'API, avec la clé
+demandée à Jean au démarrage.
