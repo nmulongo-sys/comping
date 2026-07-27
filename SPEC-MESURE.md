@@ -1,5 +1,6 @@
 # comping — spécification du moteur de mesure intégré
 
+> Version 0.3 — 2026-07-27. Libellés définitifs, plafond sur « Acquis », échelle graduée.
 > Version 0.2 — 2026-07-27. §7.1, §7.2 et §10.2 arbitrés.
 > Version 0.1 — 2026-07-27. **Document de spécification, à valider avant toute ligne de code.**
 > Couvre le point ouvert 5 du brief de reprise (2) : grille partagée, calibration,
@@ -337,23 +338,68 @@ Ancrée sur la référence mesurée ρ ≈ 6 % — c'est-à-dire : « faire auss
 tombe au milieu de la table, pas en haut. **Arbitrage retenu : ρ ≈ 6 % vaut « bien ».**
 La table mesure donc l'écart à l'habitude, pas une qualité absolue.
 
-| ρ = σ_locale / pas_grille | % en cible attendu | Note proposée |
+| ρ = σ_locale / pas_grille | % en cible attendu | Bouton pré-coché |
 |---|---|---|
-| ≤ 4,5 % | ≳ 80 % | facile |
-| 4,5 – 6,0 % | ≈ 68 – 80 % | bien |
-| 6,0 – 8,0 % | ≈ 55 – 68 % | difficile |
-| > 8,0 % | ≲ 55 % | à revoir |
+| ≤ 4,5 % | ≳ 80 % | **Acquis** — sous réserve du §10.3 |
+| 4,5 – 6,0 % | ≈ 68 – 80 % | **Bien** ← jeu de référence |
+| 6,0 – 8,0 % | ≈ 55 – 68 % | **En progrès** |
+| > 8,0 % | ≲ 55 % | **Débuts** |
 
 Le % en cible sert de **contrôle de cohérence**, pas de second critère : si les deux
 colonnes désignent des notes différentes de plus d'un rang, l'app propose la plus basse et
 affiche « lecture discordante » — signe habituel d'une dérive de tempo ou d'un passage mal
 découpé.
 
-**Les libellés (« facile / bien / difficile / à revoir ») sont à aligner sur ceux déjà
-présents dans `comping` Passe 2.2.** Ils sont ici des étiquettes de rang, pas une
-proposition d'interface.
+**Libellés définitifs, relevés dans `comping` Passe 2.2 : Débuts · En progrès · Bien ·
+Acquis.** Ils qualifient **la carte**, pas la tentative — ce qui impose le plafond du §10.3.
 
-### 10.3 Ce qui ne change pas
+### 10.3 Plafond sur « Acquis » — **[V]** validé 2026-07-27
+
+Les quatre libellés de `comping` décrivent l'état d'une **carte**, pas la qualité d'une
+**tentative**. Une prise de 45 s peut légitimement dire « cette tentative était dure » ;
+elle ne peut pas établir qu'une carte est acquise — l'acquis est une propriété d'un
+historique.
+
+D'où la règle : **la mesure ne pré-coche jamais « Acquis » sur une prise isolée.** Elle
+plafonne à « Bien » tant que la condition n'est pas remplie :
+
+> trois mesures **concluantes** (§9.1) consécutives à quadruplet constant (§6),
+> toutes à ρ ≤ 4,5 %.
+
+C'est exactement le seuil qui déclenche déjà la montée d'échelon (§7.2) : un seul compteur
+sert aux deux, il n'y en a pas deux à tenir synchronisés.
+
+Jean peut évidemment cocher « Acquis » à la main à tout moment. Le plafond porte sur la
+*proposition*, jamais sur la décision.
+
+### 10.4 Échelle graduée — **[V]** validé 2026-07-27
+
+Quatre boutons perdent la position *dans* le rang : ρ = 5,9 % et ρ = 4,6 % cochent tous
+deux « Bien » et ne sont pas la même prise. Une barre graduée est donc affichée **sous** les
+boutons, sans les remplacer.
+
+| Élément | Spécification |
+|---|---|
+| Axe | linéaire en ρ, **12 % à gauche → 3 % à droite**. Sens de lecture = sens du progrès. Légende « plus régulier → » sous l'axe. |
+| Trait plein | la mesure du jour. **σ en millisecondes au-dessus** (grandeur tangible), **ρ en pourcentage en dessous** (seule grandeur comparable d'un tempo à l'autre). |
+| Repère fixe | pointillé à **6 %**, libellé « ton habitude ». La barre montre l'écart à la référence, pas une note absolue. |
+| Marqueur fantôme | la mesure précédente **au même quadruplet**. Absent s'il n'y en a pas — jamais de zéro par défaut. |
+| Zone hachurée | plage « Acquis » hachurée tant que le plafond du §10.3 n'est pas levé. |
+| Mesure non concluante | barre en trame pâle, aucun marqueur, motif de rejet écrit. Ni « Débuts », ni 0. |
+
+Deux contraintes fermes : les quatre plages portent leur libellé **écrit** sous la barre —
+jamais la couleur seule —, et le marqueur ne s'anime pas sous `prefers-reduced-motion`.
+
+### 10.5 Le cas non concluant n'est pas une mauvaise note
+
+Distinction à ne pas rater à l'implémentation. « Débuts » signifie *représenter tout de
+suite* : c'est le bon comportement pour un jeu réellement dispersé. Une mesure **non
+concluante** (§9.1 — moins de 24 gestes, Rayleigh non significatif, tempo hors des 3 %)
+ne doit **jamais** retomber sur « Débuts » par défaut : elle ne pré-coche rien et rend la
+main. Sinon un micro qui décroche se transforme en punition, et l'historique de la carte
+enregistre un échec qui n'a pas eu lieu.
+
+### 10.6 Ce qui ne change pas
 
 Le moteur SM-2 simplifié de `comping` reste intact : intervalles, plafond 90 jours,
 crédit de rappel ×1,15. La mesure alimente son entrée, elle ne le remplace pas.
@@ -449,4 +495,3 @@ une par quadruplet, conservée comme point d'origine **[P]**.
 | d | Ratio de swing dans `recalculer()` | chapitres 9–11, hors périmètre |
 | e | Habillage de timbre | conditionné à une prise vérifiant σ insensible au timbre |
 | f | Origine des doublons à 59–75 ms | point ouvert 7 ; sans effet sur cette spec, `ecart_min_ms = 120` les absorbe |
-| g | Libellés exacts des notes SRS | à relever dans `comping` Passe 2.2 |
