@@ -1,0 +1,922 @@
+{
+  "outil": "analyse-attaque",
+  "version": 3,
+  "date": "2026-07-27T02:19:28.564Z",
+  "reglages": {
+    "tempo": 90,
+    "subdivision": 2,
+    "temps_par_mesure": 4,
+    "decalage_ms": 0,
+    "sensibilite": 2.5,
+    "ecart_min_ms": 55,
+    "fusion_ms": 120,
+    "fenetre_gestes": 24,
+    "echantillonnage_hz": 48000
+  },
+  "bilan": {
+    "gestes": 52,
+    "detections": 82,
+    "fenetre": {
+      "accroche": 0.785,
+      "p": 2.15e-8,
+      "biais_ms": -12.4,
+      "sigma_ms": 36.9,
+      "subdivision_ajustee": 1,
+      "harmoniques": [
+        0.785,
+        0.659,
+        0.487,
+        0.157
+      ]
+    },
+    "session": {
+      "accroche": 0.832,
+      "sigma_ms": 32.1,
+      "subdivision_ajustee": 1
+    },
+    "tempo_joue_bpm": 89.7,
+    "ecart_dynamique_db": 44.3
+  },
+  "gestes": [
+    {
+      "temps_s": 3.696,
+      "detections": 2,
+      "etalement_ms": 69.3,
+      "case_grille": 9,
+      "position_mesure": 1,
+      "ecart_ms": -12.7,
+      "intensite_db": -9.7
+    },
+    {
+      "temps_s": 4.016,
+      "detections": 1,
+      "etalement_ms": 0,
+      "case_grille": 10,
+      "position_mesure": 2,
+      "ecart_ms": -26,
+      "intensite_db": -9.7
+    },
+    {
+      "temps_s": 4.3467,
+      "detections": 1,
+      "etalement_ms": 0,
+      "case_grille": 11,
+      "position_mesure": 3,
+      "ecart_ms": -28.7,
+      "intensite_db": -9.4
+    },
+    {
+      "temps_s": 4.6347,
+      "detections": 1,
+      "etalement_ms": 0,
+      "case_grille": 12,
+      "position_mesure": 4,
+      "ecart_ms": -74,
+      "intensite_db": -12.5
+    },
+    {
+      "temps_s": 5.0027,
+      "detections": 1,
+      "etalement_ms": 0,
+      "case_grille": 13,
+      "position_mesure": 5,
+      "ecart_ms": -39.3,
+      "intensite_db": -13.7
+    },
+    {
+      "temps_s": 5.3013,
+      "detections": 2,
+      "etalement_ms": 64,
+      "case_grille": 14,
+      "position_mesure": 6,
+      "ecart_ms": -74,
+      "intensite_db": -6.7
+    },
+    {
+      "temps_s": 5.6373,
+      "detections": 2,
+      "etalement_ms": 58.7,
+      "case_grille": 15,
+      "position_mesure": 7,
+      "ecart_ms": -71.3,
+      "intensite_db": -5.1
+    },
+    {
+      "temps_s": 5.9787,
+      "detections": 1,
+      "etalement_ms": 0,
+      "case_grille": 16,
+      "position_mesure": 0,
+      "ecart_ms": -63.3,
+      "intensite_db": -12.2
+    },
+    {
+      "temps_s": 6.3253,
+      "detections": 1,
+      "etalement_ms": 0,
+      "case_grille": 17,
+      "position_mesure": 1,
+      "ecart_ms": -50,
+      "intensite_db": -12.5
+    },
+    {
+      "temps_s": 6.6347,
+      "detections": 2,
+      "etalement_ms": 69.3,
+      "case_grille": 18,
+      "position_mesure": 2,
+      "ecart_ms": -74,
+      "intensite_db": -11
+    },
+    {
+      "temps_s": 6.9867,
+      "detections": 2,
+      "etalement_ms": 64,
+      "case_grille": 19,
+      "position_mesure": 3,
+      "ecart_ms": -55.3,
+      "intensite_db": -6.6
+    },
+    {
+      "temps_s": 7.36,
+      "detections": 2,
+      "etalement_ms": 69.3,
+      "case_grille": 20,
+      "position_mesure": 4,
+      "ecart_ms": -15.3,
+      "intensite_db": -10.4
+    },
+    {
+      "temps_s": 7.6907,
+      "detections": 1,
+      "etalement_ms": 0,
+      "case_grille": 21,
+      "position_mesure": 5,
+      "ecart_ms": -18,
+      "intensite_db": -16.5
+    },
+    {
+      "temps_s": 8,
+      "detections": 2,
+      "etalement_ms": 74.7,
+      "case_grille": 22,
+      "position_mesure": 6,
+      "ecart_ms": -42,
+      "intensite_db": -9.6
+    },
+    {
+      "temps_s": 8.3467,
+      "detections": 1,
+      "etalement_ms": 0,
+      "case_grille": 23,
+      "position_mesure": 7,
+      "ecart_ms": -28.7,
+      "intensite_db": -9.2
+    },
+    {
+      "temps_s": 8.6667,
+      "detections": 2,
+      "etalement_ms": 69.3,
+      "case_grille": 24,
+      "position_mesure": 0,
+      "ecart_ms": -42,
+      "intensite_db": -8.2
+    },
+    {
+      "temps_s": 9.008,
+      "detections": 2,
+      "etalement_ms": 58.7,
+      "case_grille": 25,
+      "position_mesure": 1,
+      "ecart_ms": -34,
+      "intensite_db": -13.5
+    },
+    {
+      "temps_s": 9.3547,
+      "detections": 2,
+      "etalement_ms": 64,
+      "case_grille": 26,
+      "position_mesure": 2,
+      "ecart_ms": -20.7,
+      "intensite_db": -10.8
+    },
+    {
+      "temps_s": 9.7013,
+      "detections": 2,
+      "etalement_ms": 69.3,
+      "case_grille": 27,
+      "position_mesure": 3,
+      "ecart_ms": -7.3,
+      "intensite_db": -4.8
+    },
+    {
+      "temps_s": 10.064,
+      "detections": 2,
+      "etalement_ms": 58.7,
+      "case_grille": 28,
+      "position_mesure": 4,
+      "ecart_ms": 22,
+      "intensite_db": -10.8
+    },
+    {
+      "temps_s": 10.368,
+      "detections": 2,
+      "etalement_ms": 64,
+      "case_grille": 29,
+      "position_mesure": 5,
+      "ecart_ms": -7.3,
+      "intensite_db": -11.4
+    },
+    {
+      "temps_s": 10.72,
+      "detections": 2,
+      "etalement_ms": 69.3,
+      "case_grille": 30,
+      "position_mesure": 6,
+      "ecart_ms": 11.3,
+      "intensite_db": -7.4
+    },
+    {
+      "temps_s": 11.0293,
+      "detections": 1,
+      "etalement_ms": 0,
+      "case_grille": 31,
+      "position_mesure": 7,
+      "ecart_ms": -12.7,
+      "intensite_db": -6
+    },
+    {
+      "temps_s": 11.3493,
+      "detections": 2,
+      "etalement_ms": 74.7,
+      "case_grille": 32,
+      "position_mesure": 0,
+      "ecart_ms": -26,
+      "intensite_db": -19.2
+    },
+    {
+      "temps_s": 11.6747,
+      "detections": 2,
+      "etalement_ms": 58.7,
+      "case_grille": 33,
+      "position_mesure": 1,
+      "ecart_ms": -34,
+      "intensite_db": -5.5
+    },
+    {
+      "temps_s": 12.016,
+      "detections": 1,
+      "etalement_ms": 0,
+      "case_grille": 34,
+      "position_mesure": 2,
+      "ecart_ms": -26,
+      "intensite_db": -22.3
+    },
+    {
+      "temps_s": 12.352,
+      "detections": 2,
+      "etalement_ms": 64,
+      "case_grille": 35,
+      "position_mesure": 3,
+      "ecart_ms": -23.3,
+      "intensite_db": -15.9
+    },
+    {
+      "temps_s": 12.6933,
+      "detections": 2,
+      "etalement_ms": 64,
+      "case_grille": 36,
+      "position_mesure": 4,
+      "ecart_ms": -15.3,
+      "intensite_db": -5.5
+    },
+    {
+      "temps_s": 13.0187,
+      "detections": 1,
+      "etalement_ms": 0,
+      "case_grille": 37,
+      "position_mesure": 5,
+      "ecart_ms": -23.3,
+      "intensite_db": -10.2
+    },
+    {
+      "temps_s": 13.376,
+      "detections": 2,
+      "etalement_ms": 69.3,
+      "case_grille": 38,
+      "position_mesure": 6,
+      "ecart_ms": 0.7,
+      "intensite_db": -11.3
+    },
+    {
+      "temps_s": 13.6907,
+      "detections": 2,
+      "etalement_ms": 58.7,
+      "case_grille": 39,
+      "position_mesure": 7,
+      "ecart_ms": -18,
+      "intensite_db": -12.5
+    },
+    {
+      "temps_s": 14.016,
+      "detections": 2,
+      "etalement_ms": 58.7,
+      "case_grille": 40,
+      "position_mesure": 0,
+      "ecart_ms": -26,
+      "intensite_db": -6.4
+    },
+    {
+      "temps_s": 14.336,
+      "detections": 2,
+      "etalement_ms": 69.3,
+      "case_grille": 41,
+      "position_mesure": 1,
+      "ecart_ms": -39.3,
+      "intensite_db": -3.9
+    },
+    {
+      "temps_s": 14.7253,
+      "detections": 1,
+      "etalement_ms": 0,
+      "case_grille": 42,
+      "position_mesure": 2,
+      "ecart_ms": 16.7,
+      "intensite_db": -21.4
+    },
+    {
+      "temps_s": 15.04,
+      "detections": 2,
+      "etalement_ms": 69.3,
+      "case_grille": 43,
+      "position_mesure": 3,
+      "ecart_ms": -2,
+      "intensite_db": -4.5
+    },
+    {
+      "temps_s": 15.4133,
+      "detections": 1,
+      "etalement_ms": 0,
+      "case_grille": 44,
+      "position_mesure": 4,
+      "ecart_ms": 38,
+      "intensite_db": -21.3
+    },
+    {
+      "temps_s": 15.728,
+      "detections": 2,
+      "etalement_ms": 69.3,
+      "case_grille": 45,
+      "position_mesure": 5,
+      "ecart_ms": 19.3,
+      "intensite_db": -19.4
+    },
+    {
+      "temps_s": 16.064,
+      "detections": 2,
+      "etalement_ms": 74.7,
+      "case_grille": 46,
+      "position_mesure": 6,
+      "ecart_ms": 22,
+      "intensite_db": -17.4
+    },
+    {
+      "temps_s": 16.3733,
+      "detections": 1,
+      "etalement_ms": 0,
+      "case_grille": 47,
+      "position_mesure": 7,
+      "ecart_ms": -2,
+      "intensite_db": -11.3
+    },
+    {
+      "temps_s": 16.6933,
+      "detections": 1,
+      "etalement_ms": 0,
+      "case_grille": 48,
+      "position_mesure": 0,
+      "ecart_ms": -15.3,
+      "intensite_db": -15.2
+    },
+    {
+      "temps_s": 17.024,
+      "detections": 1,
+      "etalement_ms": 0,
+      "case_grille": 49,
+      "position_mesure": 1,
+      "ecart_ms": -18,
+      "intensite_db": -5.1
+    },
+    {
+      "temps_s": 17.3707,
+      "detections": 1,
+      "etalement_ms": 0,
+      "case_grille": 50,
+      "position_mesure": 2,
+      "ecart_ms": -4.7,
+      "intensite_db": -14.8
+    },
+    {
+      "temps_s": 17.7067,
+      "detections": 2,
+      "etalement_ms": 64,
+      "case_grille": 51,
+      "position_mesure": 3,
+      "ecart_ms": -2,
+      "intensite_db": -15.7
+    },
+    {
+      "temps_s": 18.0107,
+      "detections": 2,
+      "etalement_ms": 64,
+      "case_grille": 52,
+      "position_mesure": 4,
+      "ecart_ms": -31.3,
+      "intensite_db": -15
+    },
+    {
+      "temps_s": 18.3733,
+      "detections": 1,
+      "etalement_ms": 0,
+      "case_grille": 53,
+      "position_mesure": 5,
+      "ecart_ms": -2,
+      "intensite_db": -14.7
+    },
+    {
+      "temps_s": 18.6827,
+      "detections": 2,
+      "etalement_ms": 58.7,
+      "case_grille": 54,
+      "position_mesure": 6,
+      "ecart_ms": -26,
+      "intensite_db": -3
+    },
+    {
+      "temps_s": 19.0187,
+      "detections": 2,
+      "etalement_ms": 69.3,
+      "case_grille": 55,
+      "position_mesure": 7,
+      "ecart_ms": -23.3,
+      "intensite_db": -2.4
+    },
+    {
+      "temps_s": 19.3707,
+      "detections": 2,
+      "etalement_ms": 64,
+      "case_grille": 56,
+      "position_mesure": 0,
+      "ecart_ms": -4.7,
+      "intensite_db": -18.8
+    },
+    {
+      "temps_s": 19.5733,
+      "detections": 1,
+      "etalement_ms": 0,
+      "case_grille": 57,
+      "position_mesure": 1,
+      "ecart_ms": -135.3,
+      "intensite_db": -28.6
+    },
+    {
+      "temps_s": 20.576,
+      "detections": 1,
+      "etalement_ms": 0,
+      "case_grille": 60,
+      "position_mesure": 4,
+      "ecart_ms": -132.7,
+      "intensite_db": -46.7
+    },
+    {
+      "temps_s": 37.7227,
+      "detections": 1,
+      "etalement_ms": 0,
+      "case_grille": 111,
+      "position_mesure": 7,
+      "ecart_ms": 14,
+      "intensite_db": -41.6
+    },
+    {
+      "temps_s": 38.6507,
+      "detections": 1,
+      "etalement_ms": 0,
+      "case_grille": 114,
+      "position_mesure": 2,
+      "ecart_ms": -58,
+      "intensite_db": -39.8
+    }
+  ],
+  "detections": [
+    {
+      "temps_s": 3.696,
+      "chef": true,
+      "intensite_db": -9.7
+    },
+    {
+      "temps_s": 3.7653,
+      "chef": false,
+      "intensite_db": -10.6
+    },
+    {
+      "temps_s": 4.016,
+      "chef": true,
+      "intensite_db": -9.7
+    },
+    {
+      "temps_s": 4.3467,
+      "chef": true,
+      "intensite_db": -9.4
+    },
+    {
+      "temps_s": 4.6347,
+      "chef": true,
+      "intensite_db": -12.5
+    },
+    {
+      "temps_s": 5.0027,
+      "chef": true,
+      "intensite_db": -13.7
+    },
+    {
+      "temps_s": 5.3013,
+      "chef": true,
+      "intensite_db": -14.1
+    },
+    {
+      "temps_s": 5.3653,
+      "chef": false,
+      "intensite_db": -6.7
+    },
+    {
+      "temps_s": 5.6373,
+      "chef": true,
+      "intensite_db": -5.1
+    },
+    {
+      "temps_s": 5.696,
+      "chef": false,
+      "intensite_db": -8.1
+    },
+    {
+      "temps_s": 5.9787,
+      "chef": true,
+      "intensite_db": -12.2
+    },
+    {
+      "temps_s": 6.3253,
+      "chef": true,
+      "intensite_db": -12.5
+    },
+    {
+      "temps_s": 6.6347,
+      "chef": true,
+      "intensite_db": -19.2
+    },
+    {
+      "temps_s": 6.704,
+      "chef": false,
+      "intensite_db": -11
+    },
+    {
+      "temps_s": 6.9867,
+      "chef": true,
+      "intensite_db": -6.6
+    },
+    {
+      "temps_s": 7.0507,
+      "chef": false,
+      "intensite_db": -6.9
+    },
+    {
+      "temps_s": 7.36,
+      "chef": true,
+      "intensite_db": -10.4
+    },
+    {
+      "temps_s": 7.4293,
+      "chef": false,
+      "intensite_db": -15.4
+    },
+    {
+      "temps_s": 7.6907,
+      "chef": true,
+      "intensite_db": -16.5
+    },
+    {
+      "temps_s": 8,
+      "chef": true,
+      "intensite_db": -17.6
+    },
+    {
+      "temps_s": 8.0747,
+      "chef": false,
+      "intensite_db": -9.6
+    },
+    {
+      "temps_s": 8.3467,
+      "chef": true,
+      "intensite_db": -9.2
+    },
+    {
+      "temps_s": 8.6667,
+      "chef": true,
+      "intensite_db": -14.4
+    },
+    {
+      "temps_s": 8.736,
+      "chef": false,
+      "intensite_db": -8.2
+    },
+    {
+      "temps_s": 9.008,
+      "chef": true,
+      "intensite_db": -13.5
+    },
+    {
+      "temps_s": 9.0667,
+      "chef": false,
+      "intensite_db": -19.2
+    },
+    {
+      "temps_s": 9.3547,
+      "chef": true,
+      "intensite_db": -12.7
+    },
+    {
+      "temps_s": 9.4187,
+      "chef": false,
+      "intensite_db": -10.8
+    },
+    {
+      "temps_s": 9.7013,
+      "chef": true,
+      "intensite_db": -4.8
+    },
+    {
+      "temps_s": 9.7707,
+      "chef": false,
+      "intensite_db": -11.4
+    },
+    {
+      "temps_s": 10.064,
+      "chef": true,
+      "intensite_db": -12.1
+    },
+    {
+      "temps_s": 10.1227,
+      "chef": false,
+      "intensite_db": -10.8
+    },
+    {
+      "temps_s": 10.368,
+      "chef": true,
+      "intensite_db": -11.4
+    },
+    {
+      "temps_s": 10.432,
+      "chef": false,
+      "intensite_db": -13.5
+    },
+    {
+      "temps_s": 10.72,
+      "chef": true,
+      "intensite_db": -17.7
+    },
+    {
+      "temps_s": 10.7893,
+      "chef": false,
+      "intensite_db": -7.4
+    },
+    {
+      "temps_s": 11.0293,
+      "chef": true,
+      "intensite_db": -6
+    },
+    {
+      "temps_s": 11.3493,
+      "chef": true,
+      "intensite_db": -19.2
+    },
+    {
+      "temps_s": 11.424,
+      "chef": false,
+      "intensite_db": -22.2
+    },
+    {
+      "temps_s": 11.6747,
+      "chef": true,
+      "intensite_db": -6.8
+    },
+    {
+      "temps_s": 11.7333,
+      "chef": false,
+      "intensite_db": -5.5
+    },
+    {
+      "temps_s": 12.016,
+      "chef": true,
+      "intensite_db": -22.3
+    },
+    {
+      "temps_s": 12.352,
+      "chef": true,
+      "intensite_db": -15.9
+    },
+    {
+      "temps_s": 12.416,
+      "chef": false,
+      "intensite_db": -17.3
+    },
+    {
+      "temps_s": 12.6933,
+      "chef": true,
+      "intensite_db": -13.8
+    },
+    {
+      "temps_s": 12.7573,
+      "chef": false,
+      "intensite_db": -5.5
+    },
+    {
+      "temps_s": 13.0187,
+      "chef": true,
+      "intensite_db": -10.2
+    },
+    {
+      "temps_s": 13.376,
+      "chef": true,
+      "intensite_db": -17.5
+    },
+    {
+      "temps_s": 13.4453,
+      "chef": false,
+      "intensite_db": -11.3
+    },
+    {
+      "temps_s": 13.6907,
+      "chef": true,
+      "intensite_db": -12.5
+    },
+    {
+      "temps_s": 13.7493,
+      "chef": false,
+      "intensite_db": -13.3
+    },
+    {
+      "temps_s": 14.016,
+      "chef": true,
+      "intensite_db": -18.8
+    },
+    {
+      "temps_s": 14.0747,
+      "chef": false,
+      "intensite_db": -6.4
+    },
+    {
+      "temps_s": 14.336,
+      "chef": true,
+      "intensite_db": -7.7
+    },
+    {
+      "temps_s": 14.4053,
+      "chef": false,
+      "intensite_db": -3.9
+    },
+    {
+      "temps_s": 14.7253,
+      "chef": true,
+      "intensite_db": -21.4
+    },
+    {
+      "temps_s": 15.04,
+      "chef": true,
+      "intensite_db": -4.5
+    },
+    {
+      "temps_s": 15.1093,
+      "chef": false,
+      "intensite_db": -16.5
+    },
+    {
+      "temps_s": 15.4133,
+      "chef": true,
+      "intensite_db": -21.3
+    },
+    {
+      "temps_s": 15.728,
+      "chef": true,
+      "intensite_db": -19.4
+    },
+    {
+      "temps_s": 15.7973,
+      "chef": false,
+      "intensite_db": -26.2
+    },
+    {
+      "temps_s": 16.064,
+      "chef": true,
+      "intensite_db": -21.6
+    },
+    {
+      "temps_s": 16.1387,
+      "chef": false,
+      "intensite_db": -17.4
+    },
+    {
+      "temps_s": 16.3733,
+      "chef": true,
+      "intensite_db": -11.3
+    },
+    {
+      "temps_s": 16.6933,
+      "chef": true,
+      "intensite_db": -15.2
+    },
+    {
+      "temps_s": 17.024,
+      "chef": true,
+      "intensite_db": -5.1
+    },
+    {
+      "temps_s": 17.3707,
+      "chef": true,
+      "intensite_db": -14.8
+    },
+    {
+      "temps_s": 17.7067,
+      "chef": true,
+      "intensite_db": -15.7
+    },
+    {
+      "temps_s": 17.7707,
+      "chef": false,
+      "intensite_db": -19.4
+    },
+    {
+      "temps_s": 18.0107,
+      "chef": true,
+      "intensite_db": -18.8
+    },
+    {
+      "temps_s": 18.0747,
+      "chef": false,
+      "intensite_db": -15
+    },
+    {
+      "temps_s": 18.3733,
+      "chef": true,
+      "intensite_db": -14.7
+    },
+    {
+      "temps_s": 18.6827,
+      "chef": true,
+      "intensite_db": -17.3
+    },
+    {
+      "temps_s": 18.7413,
+      "chef": false,
+      "intensite_db": -3
+    },
+    {
+      "temps_s": 19.0187,
+      "chef": true,
+      "intensite_db": -2.4
+    },
+    {
+      "temps_s": 19.088,
+      "chef": false,
+      "intensite_db": -9.3
+    },
+    {
+      "temps_s": 19.3707,
+      "chef": true,
+      "intensite_db": -18.8
+    },
+    {
+      "temps_s": 19.4347,
+      "chef": false,
+      "intensite_db": -25.4
+    },
+    {
+      "temps_s": 19.5733,
+      "chef": true,
+      "intensite_db": -28.6
+    },
+    {
+      "temps_s": 20.576,
+      "chef": true,
+      "intensite_db": -46.7
+    },
+    {
+      "temps_s": 37.7227,
+      "chef": true,
+      "intensite_db": -41.6
+    },
+    {
+      "temps_s": 38.6507,
+      "chef": true,
+      "intensite_db": -39.8
+    }
+  ]
+}
