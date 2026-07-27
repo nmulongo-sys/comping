@@ -19,9 +19,10 @@ const path = require("path");
    regrouper(detections, ecartMinMs)
        detections : [{temps_s, intensite_db}] triées croissant
        → [{temps_s, detections, etalement_ms, intensite_db}]
-       Règle établie sur sortie réelle v1.6 (voir T2) :
+       Règle relevée dans analyse-attaque v1.5, fonction regrouper() :
          · un groupe s'ouvre sur une détection (le « chef ») ;
-         · toute détection à ≤ ecartMinMs du PREMIER du groupe y est absorbée ;
+         · une détection est absorbée si elle est à ≤ ecartMinMs de la DERNIÈRE
+           du groupe ET à ≤ 2,5 × ecartMinMs du chef ; sinon elle ouvre ;
          · temps_s      = celui du chef ;
          · etalement_ms = dernier − premier ;
          · intensite_db = MAXIMUM du groupe, PAS celle du chef.
@@ -82,13 +83,16 @@ function gestesSynthetiques({ n, pas_s, sigma_ms, biais_ms = 0, ancre_s = 10, gr
   return out;
 }
 
-/* ═══ T2 (partiel) — regroupement conforme à la sortie réelle v1.6 ═════════
+/* ═══ T2 (partiel) — regroupement conforme à la sortie réelle v1.5 ═════════
    Le fichier de séance libre du 27 contient à la fois le flux de détections
-   et les gestes tels que v1.6 les a produits : c'est une vérité terrain, pas
-   une supposition. Le test complet du §13 (293 détections du protocole) exige
+   et les gestes tels que v1.5 les a produits : c'est une vérité terrain, pas
+   une supposition. Attention : cette fixture ne discrimine PAS le chaînage
+   (règle réelle et règle « depuis le chef » y donnent toutes deux 52/52) —
+   d'où T2c et T2d, bâtis sur le code source. Le test complet du §13
+   (293 détections → 162 gestes, cf. commentaire de regrouper()) exige
    protocole-2026-07-27-03-17-23.json, non fourni à ce jour.               */
 const FIXTURE = path.join(__dirname, "fixtures", "attaques-2026-07-27-02-19-28.json");
-test("T2 · regroupement — 82 détections réelles → les 52 gestes de v1.6", () => {
+test("T2 · regroupement — 82 détections réelles → les 52 gestes de v1.5", () => {
   const j = JSON.parse(fs.readFileSync(FIXTURE, "utf8"));
   const attendu = j.gestes, obtenu = M.regrouper(j.detections, j.reglages.fusion_ms);
   egal(obtenu.length, attendu.length, "nombre de gestes :");
@@ -108,16 +112,27 @@ test("T2b · l'intensité du geste est le maximum du groupe, pas celle du chef",
   proche(g[0].temps_s, 1.000, 1e-9, "le chef marque le temps :");
   proche(g[0].intensite_db, -6, 1e-9, "intensité = max du groupe :");
 });
-test("T2c · ecart_min_ms se mesure depuis le chef, pas depuis la détection précédente", () => {
-  // trois détections espacées de 100 ms : 0 et 100 fusionnent, 200 ouvre un geste.
+test("T2c · le chaînage est autorisé : l'écart se mesure depuis la DERNIÈRE détection du geste", () => {
+  // Règle relevée dans analyse-attaque v1.5, fonction regrouper() :
+  //   nouveau geste si  t − cur.tFin > fusion  OU  t − cur.t > 2,5 × fusion
+  // Trois détections espacées de 100 ms à fusion = 120 ms : tout se chaîne.
   const g = M.regrouper([
     { temps_s: 0.000, intensite_db: -10 },
     { temps_s: 0.100, intensite_db: -10 },
     { temps_s: 0.200, intensite_db: -10 }
   ], 120);
-  egal(g.length, 2, "chaînage interdit :");
-  egal(g[0].detections, 2);
+  egal(g.length, 1, "chaînage autorisé sous le plafond :");
+  egal(g[0].detections, 3);
+  proche(g[0].etalement_ms, 200, 0.15, "étalement :");
+});
+test("T2d · plafond d'étalement à 2,5 × fusion : au-delà, le geste se referme", () => {
+  // 0 / 100 / 200 / 300 / 400 ms à fusion = 120 ms → plafond 300 ms.
+  // La 5ᵉ détection est à 100 ms de la précédente, mais à 400 ms du chef : elle ouvre.
+  const g = M.regrouper([0, 0.1, 0.2, 0.3, 0.4].map(t => ({ temps_s: t, intensite_db: -10 })), 120);
+  egal(g.length, 2, "le plafond coupe :");
+  egal(g[0].detections, 4);
   egal(g[1].detections, 1);
+  proche(g[1].temps_s, 0.4, 1e-9);
 });
 
 /* ═══ T3 — changement d'échelon en cours de carte ═══════════════════════════
