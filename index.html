@@ -173,6 +173,21 @@ input[type=range]{width:100%;accent-color:var(--or);height:32px}
 .spark{width:100%;height:56px;display:block}
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 :focus-visible{outline:2px solid var(--or);outline-offset:2px}
+
+/* ── calibration de latence (§2) ── */
+#calib-ecran{position:fixed;inset:0;z-index:60;background:var(--creme);
+  display:flex;flex-direction:column;justify-content:center;padding:26px 20px;overflow-y:auto}
+#calib-ecran[hidden]{display:none}
+#calib-ecran h2{font-family:var(--serif);font-size:1.5rem;margin:0 0 4px}
+#calib-ecran .pas{font-size:.95rem;line-height:1.5;margin:9px 0}
+#calib-ecran ol{margin:9px 0 0 18px;padding:0;font-size:.95rem;line-height:1.6}
+#calib-jauge{height:5px;background:var(--creme2);border-radius:3px;overflow:hidden;margin:17px 0 7px}
+#calib-jauge i{display:block;height:100%;width:0;background:var(--or);transition:width .18s linear}
+#calib-compte{font-family:var(--serif);font-size:2.6rem;line-height:1;margin:5px 0}
+#calib-verdict{font-size:.95rem;line-height:1.55;margin:11px 0}
+#calib-verdict b{font-family:var(--serif);font-size:1.35rem}
+.calib-rejet{color:var(--brique)}
+@media (prefers-reduced-motion:reduce){#calib-jauge i{transition:none}}
 </style>
 </head>
 <body>
@@ -334,6 +349,14 @@ input[type=range]{width:100%;accent-color:var(--or);height:32px}
     <p id="stat-entretien" style="margin-top:5px;font-size:.9rem"></p>
   </div>
   <div class="carte" id="liste-journal"></div>
+  <div class="carte" id="carte-calibration">
+    <span class="etiquette">Calibration de latence</span>
+    <p id="calib-etat" style="margin-top:5px;font-size:.9rem"></p>
+    <div class="ligne-b" style="margin-top:9px">
+      <button class="b creux petit" id="calibrer">Calibrer cet appareil</button>
+      <button class="b creux petit" id="calib-oublier" hidden>Oublier</button>
+    </div>
+  </div>
   <hr>
   <div class="ligne-b">
     <button class="b creux petit" id="exporter">Exporter</button>
@@ -360,6 +383,234 @@ input[type=range]{width:100%;accent-color:var(--or);height:32px}
   <div id="tiroir-corps"></div>
   <button class="b creux petit" id="fermer-tiroir" style="margin-top:13px">Fermer</button>
 </div>
+
+<div id="calib-ecran" role="dialog" aria-modal="true" aria-labelledby="calib-titre" hidden>
+  <h2 id="calib-titre">Calibration de latence</h2>
+  <p class="pas" id="calib-sous">Une fois par appareil. Elle mesure le retard entre le clic
+    programmé et le clic réellement entendu par le micro.</p>
+  <div id="calib-consigne">
+    <ol>
+      <li><b>Retire le casque.</b></li>
+      <li>Pose le téléphone à plat, micro et haut-parleur libres.</li>
+      <li>Ne parle pas et ne bouge pas l'appareil pendant les 25 secondes.</li>
+    </ol>
+    <p class="pas"><small>C'est la seule opération de l'application où le haut-parleur est
+      utilisé — et elle l'exige : le son doit repasser par le micro.</small></p>
+  </div>
+  <div id="calib-mesure" hidden>
+    <p class="pas">Mesure en cours — laisse l'appareil tranquille.</p>
+    <div id="calib-jauge"><i></i></div>
+    <p id="calib-compte">0</p>
+    <p class="pas"><small>clics émis sur 24</small></p>
+  </div>
+  <div id="calib-fin" hidden><p id="calib-verdict"></p></div>
+  <div class="ligne-b" style="margin-top:19px">
+    <button class="b" id="calib-lancer">Commencer</button>
+    <button class="b creux" id="calib-fermer">Fermer</button>
+  </div>
+</div>
+
+<script id="src-detecteur" type="text/plain">
+class DetecteurAttaque extends AudioWorkletProcessor {
+  constructor(options){
+    super();
+    const o = options.processorOptions || {};
+    this.N = o.N || 1024;
+    this.HOP = o.HOP || 256;
+    this.sens = o.sens || 2.5;
+    this.minIOI = o.minIOI || 0.055;
+    this.porte = Math.pow(10, -58/20);
+
+    const N = this.N;
+    this.ring = new Float32Array(N);
+    this.w = 0;
+    this.acc = 0;
+    this.re = new Float32Array(N);
+    this.im = new Float32Array(N);
+    this.pic = new Float32Array(N/2).fill(1e-4);   // crête glissante par bande
+    this.precB = new Float32Array(N/2);            // spectre blanchi précédent
+    this.decroit = Math.exp(-(this.HOP/sampleRate)/0.6);
+    this.win = new Float32Array(N);
+    for(let i=0;i<N;i++) this.win[i] = 0.5 - 0.5*Math.cos(2*Math.PI*i/N);
+
+    this.cosT = new Float32Array(N/2);
+    this.sinT = new Float32Array(N/2);
+    for(let i=0;i<N/2;i++){
+      this.cosT[i] = Math.cos(-2*Math.PI*i/N);
+      this.sinT[i] = Math.sin(-2*Math.PI*i/N);
+    }
+    // bande utile : jusqu'à 6 kHz, l'aigu extrême n'apporte que du souffle
+    this.binMax = Math.min(N/2, Math.max(8, Math.floor(6000 / (sampleRate/N))));
+
+    this.hist = new Float32Array(45);
+    this.hi = 0;
+    this.tri = new Float32Array(45);
+
+    this.f0 = 0; this.f1 = 0; this.f2 = 0;
+    this.thr1 = 0;
+    // les crêtes par bande partent de leur plancher : tant qu'elles n'ont pas
+    // convergé, le flux blanchi n'a pas de sens. ~0,45 s d'échauffement.
+    this.echauffement = Math.ceil(0.45 * sampleRate / this.HOP);
+    this.dernierOnset = -10;
+    this.attente = null;      // onset en attente de mesure de crête
+
+    this.lotFlux = [];
+    this.lotSeuil = [];
+    this.lotT0 = 0;
+
+    this.port.onmessage = (e) => {
+      const d = e.data || {};
+      if(typeof d.sens === 'number') this.sens = d.sens;
+      if(typeof d.minIOI === 'number') this.minIOI = d.minIOI;
+    };
+  }
+
+  fft(){
+    const N = this.N, re = this.re, im = this.im;
+    for(let i=1, j=0; i<N; i++){
+      let bit = N >> 1;
+      for(; j & bit; bit >>= 1) j ^= bit;
+      j ^= bit;
+      if(i < j){
+        let t = re[i]; re[i] = re[j]; re[j] = t;
+        t = im[i]; im[i] = im[j]; im[j] = t;
+      }
+    }
+    for(let len=2; len<=N; len<<=1){
+      const demi = len >> 1, pas = N / len;
+      for(let i=0; i<N; i+=len){
+        for(let j=0; j<demi; j++){
+          const k = j * pas;
+          const cr = this.cosT[k], ci = this.sinT[k];
+          const a = i + j, b = a + demi;
+          const vr = re[b]*cr - im[b]*ci;
+          const vi = re[b]*ci + im[b]*cr;
+          re[b] = re[a] - vr; im[b] = im[a] - vi;
+          re[a] += vr;        im[a] += vi;
+        }
+      }
+    }
+  }
+
+  mediane(){
+    this.tri.set(this.hist);
+    const a = this.tri;
+    // tri par insertion : 45 éléments, largement suffisant
+    for(let i=1;i<a.length;i++){
+      const v = a[i]; let j = i-1;
+      while(j>=0 && a[j]>v){ a[j+1]=a[j]; j--; }
+      a[j+1] = v;
+    }
+    return a[22];
+  }
+
+  livrer(){
+    const a = this.attente;
+    this.attente = null;
+    if(!a) return;
+    this.port.postMessage({type:'onset', t:a.t, force:a.force, rms:a.rms, crete:a.crete});
+  }
+
+  trame(finEch){
+    const N = this.N, w = this.w;
+    for(let i=0;i<N;i++){
+      this.re[i] = this.ring[(w+i) % N] * this.win[i];
+      this.im[i] = 0;
+    }
+    this.fft();
+
+    // Blanchiment adaptatif : chaque bande est ramenée à sa propre crête récente.
+    // Sans cela, les partiels graves qui battent entre eux pendant la résonance
+    // produisent des montées d'énergie indiscernables d'une vraie attaque.
+    let flux = 0;
+    const ech = 4/N;
+    for(let k=1;k<this.binMax;k++){
+      const mg = Math.hypot(this.re[k], this.im[k]) * ech;
+      const p = Math.max(mg, this.pic[k]*this.decroit, 2e-4);
+      this.pic[k] = p;
+      const b = mg / p;
+      const d = b - this.precB[k];
+      if(d > 0) flux += d;
+      this.precB[k] = b;
+    }
+    flux /= (this.binMax - 1);
+
+    // niveau efficace sur les derniers HOP échantillons, hors fenêtrage
+    let s = 0;
+    for(let i=0;i<this.HOP;i++){
+      const v = this.ring[(w - this.HOP + i + N) % N];
+      s += v*v;
+    }
+    const rms = Math.sqrt(s / this.HOP);
+
+    let crete = 0;
+    for(let i=0;i<this.HOP;i++){
+      const v = Math.abs(this.ring[(w - this.HOP + i + N) % N]);
+      if(v > crete) crete = v;
+    }
+
+    const tFin = finEch / sampleRate;
+
+    // seuil adaptatif
+    const med = this.mediane();
+    const seuil = med * this.sens + 0.0001;
+    this.hist[this.hi] = flux;
+    this.hi = (this.hi + 1) % this.hist.length;
+
+    // décalage des trames : le maximum local est testé sur f1, une trame en arrière
+    this.f2 = this.f1; this.f1 = this.f0; this.f0 = flux;
+    const hop = this.HOP / sampleRate;
+    const t1 = tFin - hop;              // fin de la trame f1
+    const thr1 = this.thr1;             // seuil calculé lors de l'appel précédent
+    this.thr1 = seuil;
+
+    if(this.attente){
+      if(rms > this.attente.rms) this.attente.rms = rms;
+      if(crete > this.attente.crete) this.attente.crete = crete;
+      if(--this.attente.reste <= 0) this.livrer();
+    }
+
+    // Le pic du flux tombe une trame après la première montée d'énergie :
+    // l'attaque se situe donc autour de t1 - hop. Correction mesurée au banc,
+    // biais résiduel < 1 ms. La latence acoustique reste à caler par l'utilisateur.
+    const tAtt = t1 - hop;
+    if(this.echauffement > 0){ this.echauffement--; }
+    else if(rms > this.porte
+       && this.f1 > thr1 && this.f1 > this.f2 && this.f1 >= this.f0
+       && (tAtt - this.dernierOnset) > this.minIOI){
+      if(this.attente) this.livrer();
+      this.dernierOnset = tAtt;
+      this.attente = {t:tAtt, force:this.f1, rms:rms, crete:crete, reste:6};
+    }
+
+    if(this.lotFlux.length === 0) this.lotT0 = tFin;
+    this.lotFlux.push(flux);
+    this.lotSeuil.push(seuil);
+    if(this.lotFlux.length >= 8){
+      this.port.postMessage({type:'trames', flux:this.lotFlux, seuil:this.lotSeuil,
+                             t0:this.lotT0, dt:this.HOP/sampleRate, rms:rms, crete:crete});
+      this.lotFlux = []; this.lotSeuil = [];
+    }
+  }
+
+  process(entrees){
+    const ch = entrees[0] && entrees[0][0];
+    if(!ch) return true;
+    const N = this.N;
+    for(let i=0;i<ch.length;i++){
+      this.ring[this.w] = ch[i];
+      this.w = (this.w + 1) % N;
+      this.acc++;
+      if(this.acc >= this.HOP){
+        this.acc -= this.HOP;
+        this.trame(currentFrame + i + 1);
+      }
+    }
+    return true;
+  }
+}
+registerProcessor('detecteur-attaque', DetecteurAttaque);
+</script>
 
 <script>
 "use strict";
@@ -608,12 +859,15 @@ function etatNeuf(){
   return {version:2,dureeSeance:25,
     metro:{bpm:80,temps:4,sub:1,swing:false,repere:"accent24",gap:false,gapJouees:2,gapMuettes:2,
            ramp:false,rampTous:8,rampPas:2,rampMax:140},
-    cartes:CORPUS.map(carteNeuve),journal:[],introJour:{date:null,n:0}};
+    cartes:CORPUS.map(carteNeuve),journal:[],introJour:{date:null,n:0},calibration:{}};
 }
 
 let S;
 try{ const b=localStorage.getItem(CLE); S=b?JSON.parse(b):etatNeuf(); if(!S||!Array.isArray(S.cartes)) S=etatNeuf(); }
 catch(e){ S=etatNeuf(); }
+
+/* migration v2.1 -> v2.2 : registre de calibration, indexé par appareil (§2.2) */
+if(!S.calibration || typeof S.calibration!=="object") S.calibration={};
 
 /* migration v2.0 -> v2.1 : le booléen jazz devient un repère à trois valeurs */
 (function migrerRepere(){
@@ -660,6 +914,18 @@ const REPERE_TXT={tous:"clic sur tous les temps",accent24:"<b>accent sur 2 et 4<
 function estAccent(rep,i){ return (rep==="accent24"||rep==="seuls24") ? (i===1||i===3) : i===0; }
 function estSilencieux(rep,i){ return rep==="seuls24" && !(i===1||i===3); }
 
+/* Synthèse d'un clic. Extraite du moteur pour que la calibration (§2) émette
+   rigoureusement le même son que le clic de travail : mesurer la latence d'un
+   autre timbre reviendrait à mesurer autre chose. */
+function emettreClic(t,f,v,forme,duree){
+  const o=ctx.createOscillator(), g=ctx.createGain();
+  o.type=forme; o.frequency.value=f;
+  g.gain.setValueAtTime(0.0001,t);
+  g.gain.exponentialRampToValueAtTime(v,t+0.002);
+  g.gain.exponentialRampToValueAtTime(0.0001,t+duree);
+  o.connect(g).connect(ctx.destination); o.start(t); o.stop(t+0.08);
+}
+
 const Moteur = {
   R:null, cible:null, on:false, timer:null,
   temps:0, sub:0, prochain:0, mesure:0, file:[],
@@ -679,12 +945,7 @@ const Moteur = {
     else if(rep==="accent24"){ if(back){f=1180;v=0.30;} else {f=700;v=0.09;} }
     else if(temps===0){ f=1500; v=0.34; }
     else { f=900; v=0.18; }
-    const o=ctx.createOscillator(), g=ctx.createGain();
-    o.type = sub===0?"square":"sine"; o.frequency.value=f;
-    g.gain.setValueAtTime(0.0001,t);
-    g.gain.exponentialRampToValueAtTime(v,t+0.002);
-    g.gain.exponentialRampToValueAtTime(0.0001,t+(sub===0?0.055:0.03));
-    o.connect(g).connect(ctx.destination); o.start(t); o.stop(t+0.08);
+    emettreClic(t,f,v,sub===0?"square":"sine",sub===0?0.055:0.03);
   },
 
   avancer(){
@@ -914,6 +1175,274 @@ $("#ramp-reglages").style.display=M.ramp?"block":"none";
 majBpm();
 
 /* ═══════════════════════════════════════════════════════════
+   3 bis · DÉTECTION D'ATTAQUES ET CALIBRATION DE LATENCE
+   SPEC-MESURE v0.4 §2 et §3. Chaîne reprise telle quelle
+   d'analyse-attaque v1.5 : le worklet est embarqué verbatim
+   dans #src-detecteur, aucune ligne n'en a été retouchée.
+   ═══════════════════════════════════════════════════════════ */
+
+/* §3.0 — deux paramètres distincts, à ne jamais confondre.
+   ECART_MIN_MS est le temps réfractaire DU DÉTECTEUR ; FUSION_MS regroupe
+   les détections en gestes, après coup. Aucun des deux n'est exposé. */
+const SENS_DETECTION = 2.5;
+const ECART_MIN_MS   = 55;
+const FUSION_MS      = 120;
+
+/* ── fonctions pures, testables sous Node ───────────────────────────────── */
+
+function mediane(v){
+  if(!v.length) return null;
+  const t=v.slice().sort((a,b)=>a-b), m=t.length>>1;
+  return t.length%2 ? t[m] : (t[m-1]+t[m])/2;
+}
+
+/* Quartiles par interpolation linéaire sur les rangs (convention usuelle,
+   identique à numpy). L'écart interquartile résiste aux quelques clics
+   manqués ou doublés, contrairement à l'écart-type. */
+function quantile(v,p){
+  if(!v.length) return null;
+  const t=v.slice().sort((a,b)=>a-b), h=(t.length-1)*p, b=Math.floor(h), r=h-b;
+  return b+1<t.length ? t[b]+r*(t[b+1]-t[b]) : t[b];
+}
+function interquartile(v){
+  if(v.length<2) return null;
+  return quantile(v,0.75)-quantile(v,0.25);
+}
+
+/* Appariement clic programmé → clic entendu. Une détection ne sert qu'une
+   fois : la résonance du haut-parleur en produit souvent deux ou trois par
+   clic, seule la première compte — les suivantes ne sont pas des attaques,
+   c'est le même son qui redéclenche (§ point ouvert f). */
+function apparier(programmes, detections, opts){
+  const o = opts||{}, avant = o.avant===undefined?0.05:o.avant,
+        apres = o.apres===undefined?0.5:o.apres;
+  const libres = detections.slice().sort((a,b)=>a-b);
+  const pris = new Array(libres.length).fill(false), paires=[];
+  for(let k=0;k<programmes.length;k++){
+    const t=programmes[k];
+    for(let i=0;i<libres.length;i++){
+      if(pris[i]) continue;
+      if(libres[i] < t-avant) continue;
+      if(libres[i] > t+apres) break;
+      pris[i]=true;
+      paires.push({k:k, t_prog:t, t_det:libres[i], delta_ms:(libres[i]-t)*1000});
+      break;
+    }
+  }
+  return paires;
+}
+
+/* §2.1 point 5 — rejet en deçà de 20 clics ou au-delà de 15 ms d'écart
+   interquartile. Rien n'est enregistré : une calibration douteuse est pire
+   que pas de calibration, elle déplacerait le biais affiché sans le dire. */
+function verdictCalibration(deltas, opts){
+  const o = opts||{}, minClics = o.minClics||20, iqrMax = o.iqrMax||15;
+  const n = deltas.length;
+  if(n < minClics)
+    return {ok:false, motif:"clics", n:n,
+            texte:"Seulement "+n+" clic"+(n>1?"s":"")+" sur 24 ont été entendus (20 requis)."};
+  const iqr = interquartile(deltas);
+  if(iqr > iqrMax)
+    return {ok:false, motif:"dispersion", n:n, dispersion_ms:iqr,
+            texte:"Les retards mesurés sont trop dispersés ("+arrondi1(iqr)+" ms d'écart "+
+                  "interquartile, 15 ms au plus)."};
+  return {ok:true, motif:null, n:n, latence_ms:mediane(deltas), dispersion_ms:iqr};
+}
+
+function arrondi1(x){ return (Math.round(x*10)/10).toString().replace(".",","); }
+
+/* Empreinte d'appareil (§2.2) — volontairement grossière : elle évite de
+   réutiliser la latence d'un autre téléphone, elle n'identifie pas une
+   machine. Hachage djb2 sur agent + fréquence + latence déclarée arrondie. */
+function contexteInfo(){
+  if(!ctx) ctx=new (window.AudioContext||window.webkitAudioContext)();
+  return ctx;
+}
+function empreinteAppareil(){
+  const c=contexteInfo();
+  const base=[navigator.userAgent, c.sampleRate||0,
+              Math.round((c.baseLatency||0)*1000)].join("|");
+  let h=5381;
+  for(let i=0;i<base.length;i++) h=(((h*33)^base.charCodeAt(i))>>>0);
+  return "a"+h.toString(36);
+}
+function calibrationCourante(){
+  try{ return S.calibration[empreinteAppareil()]||null; }catch(e){ return null; }
+}
+
+/* ── micro + worklet ────────────────────────────────────────────────────── */
+
+const Detecteur = {
+  flux:null, source:null, node:null, onsets:[], actif:false, moduleCharge:false,
+
+  async demarrer(){
+    initAudio();
+    this.flux = await navigator.mediaDevices.getUserMedia({audio:{
+      echoCancellation:false, noiseSuppression:false, autoGainControl:false}});
+    if(!this.moduleCharge){
+      const src=document.getElementById("src-detecteur").textContent;
+      const url=URL.createObjectURL(new Blob([src],{type:"application/javascript"}));
+      await ctx.audioWorklet.addModule(url);
+      URL.revokeObjectURL(url);
+      this.moduleCharge=true;
+    }
+    this.source=ctx.createMediaStreamSource(this.flux);
+    this.node=new AudioWorkletNode(ctx,"detecteur-attaque",{
+      numberOfInputs:1, numberOfOutputs:0, channelCount:1,
+      processorOptions:{N:1024, HOP:256, sens:SENS_DETECTION, minIOI:ECART_MIN_MS/1000}});
+    this.onsets=[];
+    this.node.port.onmessage=e=>{
+      const d=e.data;
+      if(d && d.type==="onset") this.onsets.push(d.t);
+    };
+    this.source.connect(this.node);
+    this.actif=true;
+  },
+
+  arreter(){
+    if(this.node){ this.node.port.onmessage=null; this.node.disconnect(); this.node=null; }
+    if(this.source){ this.source.disconnect(); this.source=null; }
+    if(this.flux){ this.flux.getTracks().forEach(t=>t.stop()); this.flux=null; }
+    this.actif=false;
+  }
+};
+
+/* ── procédure de calibration (§2.1) ────────────────────────────────────── */
+
+const Calibration = {
+  N_CLICS:24, INTERVALLE:1.0, AMORCE:1.2, QUEUE:1.0,
+  en_cours:false, programmes:[], suivi:null, fin:null,
+
+  ouvrir(){
+    this.reinitialiser();
+    $("#calib-ecran").hidden=false;
+    $("#calib-lancer").focus();
+  },
+
+  fermer(){
+    if(this.en_cours) this.abandonner();
+    $("#calib-ecran").hidden=true;
+    rendreCalibration();
+  },
+
+  reinitialiser(){
+    $("#calib-consigne").hidden=false;
+    $("#calib-mesure").hidden=true;
+    $("#calib-fin").hidden=true;
+    $("#calib-lancer").hidden=false;
+    $("#calib-lancer").textContent="Commencer";
+    $("#calib-jauge").firstElementChild.style.width="0";
+    $("#calib-compte").textContent="0";
+  },
+
+  async lancer(){
+    if(this.en_cours) return;
+    if(Moteur.on) Moteur.arreter();          // une seule horloge, un seul son (§1)
+    this.en_cours=true;
+    $("#calib-consigne").hidden=true;
+    $("#calib-lancer").hidden=true;
+    $("#calib-mesure").hidden=false;
+    try{
+      await Detecteur.demarrer();
+    }catch(err){
+      this.en_cours=false;
+      this.afficherRejet("Micro indisponible : "+((err&&err.message)||err)+
+        " — sans micro, la boucle acoustique ne peut pas être mesurée.");
+      return;
+    }
+    veiller();
+    const t0=ctx.currentTime+this.AMORCE;    // laisse passer l'échauffement du worklet (0,45 s)
+    this.programmes=[];
+    for(let k=0;k<this.N_CLICS;k++){
+      const t=t0+k*this.INTERVALLE;
+      emettreClic(t,900,0.18,"square",0.055); // clic de travail non accentué, à l'identique
+      this.programmes.push(t);
+    }
+    const jauge=$("#calib-jauge").firstElementChild;
+    this.suivi=setInterval(()=>{
+      const emis=this.programmes.filter(t=>t<=ctx.currentTime).length;
+      $("#calib-compte").textContent=String(emis);
+      jauge.style.width=Math.min(100,100*emis/this.N_CLICS)+"%";
+    },160);
+    const duree=(this.AMORCE+this.N_CLICS*this.INTERVALLE+this.QUEUE)*1000;
+    this.fin=setTimeout(()=>this.conclure(),duree);
+  },
+
+  abandonner(){
+    clearInterval(this.suivi); clearTimeout(this.fin);
+    this.suivi=this.fin=null;
+    Detecteur.arreter(); libererVeille();
+    this.en_cours=false;
+  },
+
+  conclure(){
+    clearInterval(this.suivi); this.suivi=null;
+    const detections=Detecteur.onsets.slice();
+    Detecteur.arreter(); libererVeille();
+    this.en_cours=false;
+
+    const paires=apparier(this.programmes,detections);
+    const v=verdictCalibration(paires.map(p=>p.delta_ms));
+    if(!v.ok){ this.afficherRejet(v.texte); return; }
+
+    S.calibration[empreinteAppareil()]={
+      latence_ms:Math.round(v.latence_ms*10)/10,
+      dispersion_ms:Math.round(v.dispersion_ms*10)/10,
+      n:v.n, date:aujourdhui(), sr:ctx.sampleRate};
+    sauver();
+
+    $("#calib-mesure").hidden=true;
+    $("#calib-fin").hidden=false;
+    $("#calib-verdict").className="";
+    $("#calib-verdict").innerHTML=
+      "<b>"+arrondi1(v.latence_ms)+" ms</b> de latence.<br>"+
+      v.n+" clics sur 24 entendus, dispersion "+arrondi1(v.dispersion_ms)+" ms.<br>"+
+      "<small>Le placement en avant ou en arrière peut maintenant être lu. "+
+      "Cette valeur ne vaut que pour cet appareil.</small>";
+    $("#calib-lancer").hidden=false;
+    $("#calib-lancer").textContent="Recommencer";
+  },
+
+  afficherRejet(texte){
+    $("#calib-mesure").hidden=true;
+    $("#calib-fin").hidden=false;
+    $("#calib-verdict").className="calib-rejet";
+    $("#calib-verdict").innerHTML=echapper(texte)+
+      "<br><small>Rien n'a été enregistré. L'application fonctionne sans calibration : "+
+      "seule la lecture du placement reste indisponible (§2.3).</small>";
+    $("#calib-lancer").hidden=false;
+    $("#calib-lancer").textContent="Réessayer";
+  }
+};
+
+function rendreCalibration(){
+  const c=calibrationCourante(), p=$("#calib-etat"), oub=$("#calib-oublier");
+  if(!p) return;
+  if(c){
+    p.innerHTML="Cet appareil est calibré : <b>"+arrondi1(c.latence_ms)+" ms</b> "+
+      "(dispersion "+arrondi1(c.dispersion_ms)+" ms, "+c.n+" clics, "+c.date+").";
+    oub.hidden=false;
+    $("#calibrer").textContent="Recalibrer";
+  }else{
+    p.textContent="Cet appareil n'est pas calibré. La mesure reste possible, "+
+      "mais le placement en avant ou en arrière ne sera pas affiché.";
+    oub.hidden=true;
+    $("#calibrer").textContent="Calibrer cet appareil";
+  }
+}
+
+$("#calibrer").addEventListener("click",()=>Calibration.ouvrir());
+$("#calib-lancer").addEventListener("click",()=>Calibration.lancer());
+$("#calib-fermer").addEventListener("click",()=>Calibration.fermer());
+$("#calib-oublier").addEventListener("click",()=>{
+  delete S.calibration[empreinteAppareil()];
+  sauver(); rendreCalibration();
+});
+document.addEventListener("keydown",e=>{
+  if(e.key==="Escape" && !$("#calib-ecran").hidden) Calibration.fermer();
+});
+
+/* ═══════════════════════════════════════════════════════════
    4 · RÉVISION ESPACÉE ET RÉCURSIVITÉ
    ═══════════════════════════════════════════════════════════ */
 function dues(){ const h=aujourdhui();
@@ -1120,7 +1649,7 @@ $$("nav button").forEach(b=>b.addEventListener("click",()=>{
   $$(".vue").forEach(v=>v.classList.remove("actif"));
   $("#vue-"+b.dataset.vue).classList.add("actif");
   window.scrollTo({top:0});
-  if(b.dataset.vue==="journal") rendreJournal();
+  if(b.dataset.vue==="journal"){ rendreJournal(); rendreCalibration(); }
   if(b.dataset.vue==="cartes") rendreCartes();
   if(b.dataset.vue==="chapitres") rendreChapitres();
   if(b.dataset.vue==="metro") dimensionner();
