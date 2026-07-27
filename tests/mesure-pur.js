@@ -7,10 +7,10 @@
    l'exécution, comme tests/calibration-tests.js le fait pour la calibration.
    Une copie dériverait sans prévenir ; un extrait ne le peut pas.
 
-   Sont extraites à ce jour les fonctions des étapes 3 et 4 du §14. Les
-   fonctions des étapes 2 et 5 — regrouper, stats, concluante, noteProposee —
-   ne sont pas encore écrites : les tests qui les appellent échouent, et
-   c'est le comportement attendu tant que le code n'existe pas (§13).
+   Sont extraites à ce jour les fonctions des étapes 2, 3 et 4 du §14.
+   noteProposee (étape 5) n'est pas encore écrite : les tests qui l'appellent
+   échouent, et c'est le comportement attendu tant que le code n'existe
+   pas (§13).
    ═══════════════════════════════════════════════════════════════════════════ */
 
 const fs = require("fs");
@@ -33,6 +33,7 @@ if (i0 < 0 || i1 < 0 || i1 < i0) {
 }
 
 const EXPORTES = [
+  "regrouper", "stats", "concluante",
   "pasGrille", "pasClic", "fen", "echelonDepart", "memeQuadruplet",
   "facteurSubdivision", "SUBDIVISIONS",
   "FEN_RELATIVE", "COEF_FEN", "PLANCHER_FEN", "FEN_FIXE_MS"
