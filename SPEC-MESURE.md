@@ -1,5 +1,8 @@
 # comping — spécification du moteur de mesure intégré
 
+> Version 0.5 — 2026-07-27. Étape 1 livrée (calibration + worklet), §2.4 consignant
+> les trois décisions d'implémentation, §4.4 sur l'ambiguïté σ_locale / σ de phase,
+> points ouverts g à j, §16 sur la consolidation du développement.
 > Version 0.4 — 2026-07-27. Correction de version (v1.5, pas v1.6), §3.0 séparant
 > `ecart_min_ms` de `fusion_ms` et fixant la règle de regroupement d'après le source,
 > contrainte réseau levée, point ouvert f tranché.
@@ -88,6 +91,25 @@ calibration: {
 Empreinte d'appareil **[P]** : hachage court de `navigator.userAgent` +
 `sampleRate` + `AudioContext.baseLatency` arrondi. Volontairement grossier : elle sert à
 éviter de réutiliser la latence d'un autre téléphone, pas à identifier une machine.
+
+### 2.4 Décisions d'implémentation — livrées le 2026-07-27, commit `94a208d`
+
+Trois choix que le §2.1 laissait ouverts, tranchés à l'écriture et testés :
+
+1. **Emplacement.** Pas de sixième onglet : calibrer est une opération unique par
+   appareil. L'entrée est dans le Journal, à côté d'Export / Import, et ouvre un écran
+   plein le temps de la procédure.
+2. **Timbre du clic de calibration.** Le clic de travail **non accentué** — 900 Hz,
+   gain 0,18, onde carrée, décroissance 55 ms. L'accent de premier temps (1500 Hz,
+   gain 0,34) est une autre attaque, donc une autre latence. La synthèse est extraite
+   dans `emettreClic()`, partagée avec le métronome, pour que les deux ne puissent plus
+   diverger silencieusement.
+3. **Appariement.** Pour chaque clic programmé, la **première** détection dans
+   `[t − 50 ms, t + 500 ms]`, et une détection ne sert qu'une fois. Conséquence directe
+   du point ouvert f : au haut-parleur, un clic produit deux à trois détections par
+   résonance. Sans cette règle, 24 clics en donnent une soixantaine et la médiane est
+   sans objet. Corollaire testé : **un clic manqué ne décale pas le suivant d'un cran** —
+   un appariement par simple ordre injecterait une erreur de 1000 ms dans la médiane.
 
 ### 2.3 Comportement en l'absence de calibration
 
@@ -213,6 +235,25 @@ Tout comptage de couverture ou de cible est calculé **centré sur le biais circ
 Sans cela, dès que la latence non calibrée dépasse `pas/2`, les attaques basculent dans la
 case suivante et sont comptées comme des trous — observé en B4 : 215 ms de biais contre
 166 ms de demi-pas. L'accroche R, invariante par translation de phase, n'est pas concernée.
+
+### 4.4 σ de phase et σ_locale ne sont pas la même grandeur — **[P]**, point ouvert i
+
+Le test de cohérence interne du §4.2 — « σ = FEN implique ≈ 68 % en cible » — porte sur
+l'écart-type de la **phase** : la dispersion des attaques autour de la grille. ρ, lui, est
+bâti sur `σ_locale`, écart-type des **intervalles** successifs (§9.2). Les deux ne
+coïncident pas.
+
+Pour des écarts indépendants, `σ_IOI = √2 · σ_phase` : un ρ de 6 % correspond alors à un
+σ de phase de 4,2 %, donc à ≈ 84 % en cible, pas 68 %. Que l'accord empirique du 27 tienne
+(ρ = 6,4 % pour 67 % en cible) signifie donc que **les écarts successifs sont fortement
+corrélés** — jeu à dérive dominante plutôt qu'à bruit blanc. C'est une propriété mesurée du
+jeu, pas une coïncidence, et elle est intéressante en soi.
+
+Conséquence à ne pas perdre : la colonne « % en cible attendu » de la table du §10.2 n'est
+calibrée **que pour ce régime de corrélation**. Sur un jeu à écarts indépendants, les deux
+colonnes désigneraient systématiquement des notes différentes et le contrôle de cohérence
+crierait « lecture discordante » à tort. Le test 4 porte donc, en attendant l'arbitrage, sur
+le σ de phase — la grandeur que la relation concerne réellement.
 
 ---
 
@@ -511,9 +552,13 @@ une par quadruplet, conservée comme point d'origine **[P]**.
 
 ## 14. Ordre de réalisation proposé
 
-1. **Calibration (§2)** — seule brique sans dépendance, et préalable à toute lecture du biais.
-2. **Import du worklet et de la statistique (§3, §9)** dans `comping/index.html`, sans
-   interface : vérifiable par les tests 1, 2, 9.
+1. ~~**Calibration (§2)**~~ — **faite** le 2026-07-27 (`94a208d`). L'annonce « seule brique
+   sans dépendance » était fausse : la procédure §2.1 passe par le worklet, donc l'étape 2
+   a été entamée en même temps. 20 tests verts, dont le test 9.
+2. **Import du worklet et de la statistique (§3, §9)** — worklet **fait** (embarqué
+   verbatim, vérifié par `diff`) ; la statistique circulaire reste à porter. Test 1
+   (worklet headless sur signal synthétique) exige un banc audio hors navigateur, non
+   couvert par la suite actuelle.
 3. **Grille partagée et quadruplet (§1, §4, §6)** — tests 3, 8.
 4. **Échelle de soutien (§7)** — tests 3, 6.
 5. **Bilan et note proposée (§10)** — tests 4, 5, 7.
@@ -530,4 +575,29 @@ une par quadruplet, conservée comme point d'origine **[P]**.
 | c | Vérification d'accord par chromagramme 8192 | point ouvert 6, spécifiée ailleurs |
 | d | Ratio de swing dans `recalculer()` | chapitres 9–11, hors périmètre |
 | e | Habillage de timbre | conditionné à une prise vérifiant σ insensible au timbre |
+| g | Justification de `fusion_ms = 120` | à refaire contre ρ, pas contre R (§3.0) : le balayage 30–600 ms n'a testé que l'invariance de l'accroche |
+| h | Première calibration réelle | aucune valeur de terrain à ce jour. À relever : nombre de clics entendus sur 24, et ordre de grandeur de la latence — sous 20 ms, le micro capte par le boîtier et non par l'air |
+| i | σ de phase contre σ_locale (§4.4) | conditionne la colonne « % en cible » du §10.2 |
+| j | Consommateurs du §2.3 | `calibrationCourante()` est exposée, rien ne l'appelle encore : le masquage du biais arrive à l'étape 5 |
 | f | Origine des doublons à 59–75 ms | **tranché** : redéclenchement sur la résonance du corps à la sortie du temps réfractaire, pas le balayage des cordes — un accord plaqué ne produit que 1,1 détection par geste. `fusion_ms = 120` les absorbe. |
+
+---
+
+## 16. Consolidation du développement — 2026-07-27
+
+Le moteur de mesure et `analyse-attaque` étaient développés dans deux fils séparés. Ils ne
+le sont plus : **tout se fait désormais dans le projet `comping`**. Motif immédiat — deux
+sessions ont travaillé le même dépôt sur des bases différentes, l'une écrivant une v1.6
+d'`index.html` qui n'a jamais existé, l'autre s'apprêtant à écraser un README enrichi
+entre-temps.
+
+Ce que la consolidation exige, et qui n'est pas encore en place :
+
+- le `README.md` d'`analyse-attaque` **après fusion** (base `b34a008` + apports de l'autre
+  session, deux affirmations périmées corrigées) ;
+- `CDC-PROTOCOLE-V2.md` (`b342010`), cahier des charges v2 de la page de capture ;
+- `protocole-2026-07-27-03-17-23.json`, sans lequel le test 2 ne peut pas vérifier
+  les 293 détections → 162 gestes.
+
+Tant que ces trois pièces manquent, une session travaillant depuis ce seul dépôt reste
+exposée à la divergence qui vient de se produire.
