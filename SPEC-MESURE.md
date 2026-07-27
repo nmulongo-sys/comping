@@ -1,5 +1,6 @@
 # comping — spécification du moteur de mesure intégré
 
+> Version 0.2 — 2026-07-27. §7.1, §7.2 et §10.2 arbitrés.
 > Version 0.1 — 2026-07-27. **Document de spécification, à valider avant toute ligne de code.**
 > Couvre le point ouvert 5 du brief de reprise (2) : grille partagée, calibration,
 > quadruplet de contexte, échelle de soutien, règle de notation.
@@ -16,7 +17,8 @@
 | **Non-objet** | Noter automatiquement. Corriger le placement. Mesurer les étouffées ou les liaisons main gauche. |
 | **Bloqué par** | Points ouverts 1 à 4 du brief pour les *valeurs* de deux constantes (§5, §10). La *structure* ci-dessous ne dépend pas de leur issue. |
 
-Chaque constante porte un statut : **[É]** établi par la mesure · **[P]** proposé dans ce
+Chaque constante porte un statut : **[É]** établi par la mesure · **[V]** validé par Jean le
+2026-07-27, provisoire tant que la mesure ne l'a pas confirmé · **[P]** proposé dans ce
 document, à valider · **[A]** en attente de la seconde série de capture.
 
 ---
@@ -234,7 +236,7 @@ de parcours, et admissible seulement si σ se révèle insensible au timbre. Sin
 devient une cinquième composante du contexte et tout l'historique antérieur devient
 incomparable.
 
-### 7.1 Seuils — proposition **[P]**, point ouvert 10
+### 7.1 Seuils — **[V]** validé provisoire 2026-07-27, point ouvert 10
 
 L'échelon **de départ** d'une carte n'est pas libre : il dépend du tempo.
 
@@ -245,9 +247,10 @@ L'échelon **de départ** d'une carte n'est pas libre : il dépend du tempo.
 | > 132 bpm | 1, `pas_clic` = noire | subdiviser au-delà encombre plus qu'il n'aide. |
 
 **Ces trois seuils sont les moins étayés de tout le document.** Ils reposent sur une prise
-par condition (série C, non concluante). Les tenir pour provisoires jusqu'au point ouvert 2.
+par condition (série C, non concluante). **Arbitrage retenu : conservés tels quels, à titre
+provisoire, jusqu'aux trois répétitions alternées C1/C2 du point ouvert 2.**
 
-### 7.2 Règle de progression **[P]**
+### 7.2 Règle de progression — **[V]** validé 2026-07-27
 
 Trois mesures **concluantes** (§9.1) consécutives notées « bien » ou mieux, à quadruplet
 constant, ouvrent une proposition :
@@ -256,7 +259,7 @@ constant, ouvrent une proposition :
 2. échelon 5 atteint : **alors seulement** +4 bpm, retour à l'échelon de départ du §7.1.
 
 Le soutien avant le tempo, parce que c'est l'axe neuf et le moins coûteux à redescendre.
-Proposition, jamais application automatique.
+Proposition, jamais application automatique. **Arbitrage retenu : soutien d'abord.**
 
 ---
 
@@ -328,10 +331,11 @@ l'app ne l'applique pas seule.
 Deux, et deux seulement : **ρ** (dispersion relative) et **% en cible**. Rien d'autre.
 Ni le biais, ni la dynamique, ni le nombre de gestes au-delà du seuil de validité.
 
-### 10.2 Table de correspondance **[P]**
+### 10.2 Table de correspondance — **[V]** validé 2026-07-27
 
 Ancrée sur la référence mesurée ρ ≈ 6 % — c'est-à-dire : « faire aussi bien que d'habitude »
-tombe au milieu de la table, pas en haut.
+tombe au milieu de la table, pas en haut. **Arbitrage retenu : ρ ≈ 6 % vaut « bien ».**
+La table mesure donc l'écart à l'habitude, pas une qualité absolue.
 
 | ρ = σ_locale / pas_grille | % en cible attendu | Note proposée |
 |---|---|---|
