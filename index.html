@@ -123,8 +123,8 @@ input[type=range]{width:100%;accent-color:var(--or);height:32px}
 .bloc-seance.encours{background:linear-gradient(90deg,rgba(184,137,43,.13),transparent);margin:0 -8px;padding:10px 8px}
 .chrono{font-family:var(--serif);font-size:3.8rem;font-weight:600;line-height:1;text-align:center}
 .chrono.fini{color:var(--brique)}
-.barre{height:4px;background:var(--creme3);border-radius:2px;overflow:hidden;margin:9px 0}
-.barre i{display:block;height:100%;background:var(--or);width:0;transition:width .4s linear}
+.jauge-bloc{height:4px;background:var(--creme3);border-radius:2px;overflow:hidden;margin:9px 0}
+.jauge-bloc i{display:block;height:100%;background:var(--or);width:0;transition:width .4s linear}
 .jalons{display:flex;gap:4px;margin:9px 0 2px}
 .jalons i{flex:1;height:5px;border-radius:3px;background:var(--creme3)}
 .jalons i.fait{background:var(--sepia)}
@@ -171,6 +171,33 @@ input[type=range]{width:100%;accent-color:var(--or);height:32px}
 .barre .motif{font-size:.72rem;color:var(--brique);margin-top:4px}
 .barre .biais{font-size:.75rem;margin-top:5px}
 .barre .biais.masque{color:var(--encre-doux)}
+
+/* ── carte de mesure (§8, §12.1) — préfixe mes- pour qu'aucune classe ne
+   retombe sur une règle existante, comme .barre l'avait fait. ── */
+.mz{margin-top:11px}
+.mes-carte{border:1px solid var(--creme3);border-radius:var(--rayon);background:#FFFDF8;
+  padding:11px 11px 12px;margin-top:11px}
+.mes-rang{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:6px}
+.mes-fermer{appearance:none;border:0;background:none;font-size:1.25rem;line-height:1;
+  color:var(--encre-doux);cursor:pointer;padding:2px 6px;min-height:44px;min-width:44px}
+.mes-texte{font-size:.86rem;line-height:1.5;margin:6px 0}
+.mes-texte small{display:block;color:var(--encre-doux);margin-top:4px;line-height:1.45}
+.mes-gros{font-family:var(--serif);font-size:3.2rem;font-weight:600;line-height:1;text-align:center;
+  margin:10px 0 4px}
+.mes-gros.presse{color:var(--brique)}
+.mes-sous{font-size:.74rem;color:var(--encre-doux);text-align:center;margin-bottom:8px}
+.mes-pouls{display:flex;gap:5px;justify-content:center;margin:9px 0 4px}
+.mes-pouls i{width:13px;height:13px;border-radius:50%;background:var(--creme2);
+  border:1px solid var(--creme3);transition:background .08s linear}
+.mes-pouls i.on{background:var(--or)}
+.mes-pouls i.accent{border-color:var(--sepia)}
+.mes-pouls i.creux{opacity:.45}
+.mes-hors{font-size:.8rem;line-height:1.5;color:var(--encre-doux);
+  border-left:3px solid var(--creme3);padding:5px 0 5px 9px}
+.mes-motif{font-size:.82rem;color:var(--brique);line-height:1.5;margin:6px 0}
+.mes-pre{font-size:.74rem;color:var(--encre-doux);margin:9px 0 3px}
+.mes-carte .notes button.pre{border-color:var(--or);box-shadow:inset 0 0 0 1px var(--or)}
+@media (prefers-reduced-motion:reduce){.mes-pouls i{transition:none}}
 .rythme{font-family:var(--serif);font-size:1.6rem;letter-spacing:.2em;line-height:1.6}
 .rappel{background:rgba(63,90,107,.1);border-left:3px solid var(--bleu);padding:8px 10px;margin:9px 0;font-size:.82rem}
 
@@ -246,7 +273,7 @@ input[type=range]{width:100%;accent-color:var(--or);height:32px}
     <hr>
     <div class="rang"><span class="etiquette" id="bloc-nom"></span><small id="seance-reste"></small></div>
     <div class="chrono" id="chrono">00:00</div>
-    <div class="barre"><i id="barre-bloc"></i></div>
+    <div class="jauge-bloc"><i id="barre-bloc"></i></div>
     <div class="jalons" id="jalons"></div>
     <p id="bloc-detail"></p>
     <div id="seance-contenu"></div>
@@ -1955,7 +1982,7 @@ const RHO_HABITUDE = RHO_RANGS[2];
 /* ── micro + worklet ────────────────────────────────────────────────────── */
 
 const Detecteur = {
-  flux:null, source:null, node:null, onsets:[], actif:false, moduleCharge:false,
+  flux:null, source:null, node:null, onsets:[], bruts:[], actif:false, moduleCharge:false,
 
   async demarrer(opts){
     const o = opts||{};
@@ -1974,10 +2001,14 @@ const Detecteur = {
       numberOfInputs:1, numberOfOutputs:0, channelCount:1,
       processorOptions:{N:1024, HOP:256, sens:SENS_DETECTION,
         minIOI:(o.minIOI_ms===undefined?ECART_MIN_MS:o.minIOI_ms)/1000}});
-    this.onsets=[];
+    this.onsets=[]; this.bruts=[];
     this.node.port.onmessage=e=>{
       const d=e.data;
-      if(d && d.type==="onset") this.onsets.push(d.t);
+      /* `onsets` reste une liste de NOMBRES : apparier() de la calibration la
+         lit ainsi (§2.5). `bruts` garde le message entier, dont `crete`, dont
+         regrouper() a besoin pour l'intensité du geste (§3.0). Deux vues,
+         une seule source — pas deux collectes. */
+      if(d && d.type==="onset"){ this.onsets.push(d.t); this.bruts.push(d); }
     };
     this.source.connect(this.node);
     this.actif=true;
@@ -2283,6 +2314,354 @@ function rendreBarre(hote, o){
   return w;
 }
 
+/* ── §8 et §12.1 — branchement du moteur dans l'interface (étape 7e) ────────
+
+   C'est ici que se rejoignent des pièces écrites séparément et qui n'avaient
+   AUCUN appelant : cycleMesure (7c), rendreBarre et biaisAffichable (7d),
+   enregistrerMesure et historiqueDe (7a), tempoJoue (7e-0). La chaîne :
+
+     Moteur.file ─▶ cycleMesure ─▶ stats ─▶ tempoJoue ─▶ concluante
+                 ─▶ noteProposee ─▶ rendreBarre + note pré-cochée
+                 ─▶ enregistrerMesure
+
+   Rien ici n'est pur : minuteries, micro, écritures d'écran. La règle « tests
+   avant code » du §13 ne mord donc pas — ce qui se teste l'est déjà.        */
+
+const Mesure = {
+  carte:null, hote:null, opts:null, etat:null, R:null, bilan:null,
+  trame:null, brut:0, tampon:[], dernierClic:null, aNous:false,
+  elt:null, corps:null,
+
+  ouvert(){ return !!this.carte; },
+
+  /* §3.2 — une carte non mesurable ne reçoit jamais de note proposée, et
+     l'app doit le DIRE sur la carte, pas le laisser deviner. */
+  estMesurable(c){ return !!(c && c.mesurable !== false); },
+
+  ouvrir(carte, hote, opts){
+    if(this.ouvert()) this.fermer();
+    this.carte=carte; this.hote=hote; this.opts=opts||{};
+    this.etat=cycleInitial(); this.bilan=null;
+    this.brut=0; this.tampon=[]; this.dernierClic=null;
+    hote.innerHTML="";
+    this.elt=document.createElement("div");
+    this.elt.className="mes-carte";
+    this.elt.innerHTML=
+      '<div class="mes-rang"><span class="etiquette">Mesure &middot; 45 s</span>'+
+      '<button class="mes-fermer" aria-label="Fermer la mesure">&times;</button></div>'+
+      '<div class="mes-corps"></div>';
+    this.corps=this.elt.querySelector(".mes-corps");
+    this.elt.querySelector(".mes-fermer").addEventListener("click",()=>this.fermer());
+    hote.appendChild(this.elt);
+    this.rendre();
+  },
+
+  fermer(){
+    this.couper();
+    const h=this.hote, o=this.opts||{};
+    this.carte=null; this.hote=null; this.opts=null; this.etat=null;
+    this.bilan=null; this.elt=null; this.corps=null; this.dernierClic=null;
+    if(h) h.innerHTML="";
+    if(o.surFermeture) o.surFermeture();
+  },
+
+  /* Toute la plomberie s'arrête ici, quel que soit le chemin de sortie —
+     bilan, abandon, fermeture. Le Moteur n'est rendu que si c'est NOUS qui
+     l'avions pris : le rendre sans l'avoir pris couperait le métronome de
+     quelqu'un d'autre (§12.1 point 1). */
+  couper(){
+    if(this.trame){ cancelAnimationFrame(this.trame); this.trame=null; }
+    if(this.aNous && Moteur.on) Moteur.arreter();
+    this.aNous=false;
+    if(Detecteur.actif) Detecteur.arreter();
+    libererVeille();
+  },
+
+  /* §12.1 point 1 — la mesure PREND le Moteur : il n'a qu'une cible, et le
+     métronome embarqué l'occupe. Le tempo est GELÉ (ramp:false) : en mode
+     progressif bpmTravail dérive de lui-même, et pas_grille avec lui — la
+     grille du §4.1 ne peut pas bouger pendant les 45 s qu'elle mesure. */
+  cibleMoteur(){
+    const self=this;
+    return {
+      id:"mesure",
+      /* §8.2 point 1 — Moteur.boucle() alimente surTemps depuis Moteur.FILE,
+         donc toute position à sub===0, y compris les temps 1 qui ne sonnent
+         pas à repere:"seuls24" et les mesures muettes du mode gap. Brancher
+         sur les clics audibles ferait que l'ancre ne se poserait jamais sur
+         ces cartes, et sans erreur visible. */
+      surTemps(ev){
+        self.evenement({type:"clic", mesure:ev.mesure, temps:ev.temps, sub:ev.sub, t:ev.t});
+        self.dernierClic=ev;
+        self.pouls(ev);
+      },
+      surTempo(){},          /* ramp coupé : jamais appelé pendant une mesure */
+      surArret(){}
+    };
+  },
+
+  async demarrer(){
+    const c=this.carte;
+    this.R=Object.assign({},c.preset,{bpm:c.bpmTravail||c.preset.bpm, ramp:false});
+    this.corps.innerHTML='<div class="mes-texte">Micro&hellip;</div>';
+    try{
+      await Detecteur.demarrer();           // réfractaire normal : les 30 ms du §2.5
+    }catch(err){                            // ne valent que pour la calibration
+      this.corps.innerHTML='<div class="mes-motif">Micro indisponible : '+
+        echapper((err&&err.message)||String(err))+
+        ". Sans micro il n'y a rien à mesurer — la carte revient à la notation manuelle.</div>";
+      this.sortie();
+      return;
+    }
+    if(!this.ouvert()){ if(Detecteur.actif) Detecteur.arreter(); return; }
+    this.brut=0; this.tampon=[];
+    if(Moteur.on) Moteur.arreter();
+    this.aNous=true;
+    Moteur.demarrer(this.R,this.cibleMoteur());
+    this.evenement({type:"demarrer"});
+    this.rendre();
+    this.trame=requestAnimationFrame(()=>this.tour());
+  },
+
+  tour(){
+    if(!this.ouvert()){ return; }
+    const t=ctx.currentTime;
+    if(this.etat.phase==="mesure"){
+      this.drainer();
+      this.evenement({type:"horloge", t:t});
+    }
+    this.majChrono(t);
+    if(this.ouvert() && (this.etat.phase==="decompte" || this.etat.phase==="mesure"))
+      this.trame=requestAnimationFrame(()=>this.tour());
+    else this.trame=null;
+  },
+
+  /* §12.1 point 2 — une détection devient un geste par regrouper(), JAMAIS
+     par un second groupeur écrit à côté : deux implémentations de la même
+     règle divergent, et la divergence serait muette. On regroupe le tampon
+     complet et on n'émet que les groupes NOUVEAUX. C'est exact parce que le
+     groupement est causal : le chef d'un groupe est sa première détection et
+     son temps ne change plus quand le groupe s'allonge.
+
+     Nourrir le cycle en détections BRUTES est l'erreur que ceci écarte : la
+     fixture du 27 donne 82 détections pour 52 gestes. */
+  drainer(){
+    const b=Detecteur.bruts, e=this.etat;
+    while(this.brut<b.length){
+      const d=b[this.brut++];
+      if(typeof d.t==="number" && d.t>=e.ancre && d.t<=e.fin)
+        this.tampon.push({temps_s:d.t,
+          intensite_db:20*Math.log10(Math.max(d.crete||1e-6,1e-6))});
+    }
+    const g=regrouper(this.tampon,FUSION_MS);
+    while(this.etat.phase==="mesure" && this.etat.gestes.length<g.length){
+      const k=this.etat.gestes.length;
+      this.evenement({type:"geste", t:g[k].temps_s, intensite_db:g[k].intensite_db});
+      if(this.etat.gestes.length===k) break;   // refusé : on ne boucle pas dessus
+    }
+  },
+
+  evenement(evt){
+    if(!this.etat) return;
+    const avant=this.etat.phase;
+    this.etat=cycleMesure(this.etat,evt);
+    if(this.etat.phase!==avant) this.surPhase(avant);
+  },
+
+  surPhase(){
+    const p=this.etat.phase;
+    if(p==="mesure"){ this.tampon=[]; this.rendre(); return; }
+    if(p==="bilan"){ this.conclure(); return; }
+    if(p==="abandon"){ this.couper(); this.rendre(); return; }
+    this.rendre();
+  },
+
+  conclure(){
+    this.couper();
+    const c=this.carte, e=this.etat;
+    const regle=c.bpmTravail||c.preset.bpm;
+    const pas=pasGrille(regle,c.preset.sub);
+    const st=stats(e.gestes,{ancre_s:e.ancre, pas_grille_s:pas});
+    const tj=tempoJoue(e.gestes,c.preset.sub);
+
+    /* §9.1 — le garde-fou du tempo ne se saute pas en silence. concluante()
+       ne teste l'écart que si tempo_joue > 0 : lui passer 0 parce que
+       l'estimation a échoué rendrait un verdict sur trois garde-fous au lieu
+       de quatre, sans le dire. Une absence visible vaut mieux. */
+    let v;
+    if(st.n>=GESTES_MIN && !tj) v={ok:false, motif:"tempo indéterminable"};
+    else v=concluante(st,{tempo_regle:regle, tempo_joue:tj?tj.bpm:0});
+
+    const quad=quadrupletDe(c), hist=historiqueDe(c.id);
+    const np=noteProposee(st,{concluante:v, quadruplet:quad, historique:hist});
+
+    /* §10.4 — marqueur fantôme : la précédente AU MÊME QUADRUPLET, ou rien.
+       Jamais un zéro par défaut, qui se lirait « très dispersé ». */
+    let rhoPrec=null;
+    for(let i=hist.length-1;i>=0 && rhoPrec===null;i--)
+      if(hist[i] && hist[i].concluante===true && memeQuadruplet(hist[i].quadruplet,quad)
+         && typeof hist[i].rho==="number") rhoPrec=hist[i].rho;
+
+    this.bilan={st:st, tj:tj, v:v, quad:quad, np:np, rhoPrec:rhoPrec, pas:pas, regle:regle};
+    this.rendre();
+  },
+
+  /* « La mesure propose, Jean valide » : la note est pré-cochée et
+     modifiable, l'app ne l'applique jamais seule. */
+  valider(q){
+    const b=this.bilan, c=this.carte, o=this.opts||{};
+    if(!b) return;
+    enregistrerMesure({
+      carte:c.id, date:new Date().toISOString(), quadruplet:b.quad,
+      concluante:b.v.ok===true, motif:b.v.ok?null:b.v.motif,
+      n_gestes:b.st.n, R:b.st.R, p:b.st.p,
+      sigma_locale_ms:b.st.sigma_locale_ms, rho:b.st.rho, pct_cible:b.st.pct_cible,
+      biais_ms:b.st.biais_ms, calibre:!!calibrationCourante(),
+      fen_ms:(b.pas>0)?fen(b.pas*1000):null,
+      note_proposee:b.np.note, note_retenue:NOTES[q]
+    });
+    const suite=o.noter;
+    this.fermer();
+    if(suite){
+      if(c.bpmTravail>c.bpmRecord) c.bpmRecord=c.bpmTravail;
+      delete c._brasse;
+      noter(c,q);
+      suite(q);
+    }
+  },
+
+  /* ── rendus ───────────────────────────────────────────────────────────── */
+
+  bouton(txt,fn,cls){
+    const b=document.createElement("button");
+    b.className="b"+(cls?" "+cls:""); b.style.marginTop="10px"; b.textContent=txt;
+    b.addEventListener("click",fn);
+    return b;
+  },
+
+  sortie(){
+    this.corps.appendChild(this.bouton("Refaire la mesure",()=>{
+      this.etat=cycleInitial(); this.bilan=null; this.rendre();
+    }));
+    this.corps.appendChild(this.bouton("Fermer",()=>this.fermer()));
+  },
+
+  pouls(ev){
+    const p=this.corps && this.corps.querySelector(".mes-pouls");
+    if(!p) return;
+    Array.from(p.children).forEach((b,i)=>{
+      b.classList.toggle("on", i===ev.temps && !ev.muet);
+    });
+  },
+
+  htmlPouls(){
+    const R=this.R||this.carte.preset, rep=R.repere||"tous";
+    let h='<div class="mes-pouls">';
+    for(let i=0;i<R.temps;i++)
+      h+='<i class="'+(estAccent(rep,i)?"accent ":"")+(estSilencieux(rep,i)?"creux":"")+'"></i>';
+    return h+"</div>";
+  },
+
+  majChrono(t){
+    if(!this.corps) return;
+    const g=this.corps.querySelector(".mes-gros"), s=this.corps.querySelector(".mes-sous");
+    if(!g) return;
+    const e=this.etat;
+    if(e.phase==="decompte"){
+      const vues=(this.dernierClic && e.mesure0!==null)
+        ? Math.max(0,this.dernierClic.mesure-e.mesure0) : 0;
+      g.textContent=String(Math.max(0,MESURES_DECOMPTE-vues));
+      if(s) s.textContent = e.mesure0===null
+        ? "en attente du premier temps 1" : "mesures avant le départ";
+    }else if(e.phase==="mesure"){
+      const r=Math.max(0,e.fin-t);
+      g.textContent=String(Math.ceil(r));
+      g.classList.toggle("presse", r<=5);
+      const n=e.gestes.length;
+      if(s) s.textContent = n+" geste"+(n>1?"s":"")+" \u00b7 "+
+        (n>=GESTES_MIN ? "le compte y est" : "il en faut "+GESTES_MIN);
+    }
+  },
+
+  rendre(){
+    if(!this.corps) return;
+    const e=this.etat, c=this.carte;
+    if(e.phase==="presentation"){
+      this.corps.innerHTML=
+        '<div class="mes-texte">Deux mesures de décompte, puis <b>45 secondes</b>. '+
+        "Joue ce que dit la consigne, sans t'arrêter."+
+        "<small>Le décompte n'est pas mesuré. Le métronome est celui de la carte et son "+
+        "tempo est gelé pendant la prise. Le micro n'enregistre rien : il ne relève que "+
+        "les instants d'attaque.</small></div>";
+      this.corps.appendChild(this.bouton("Commencer",()=>this.demarrer()));
+      return;
+    }
+    if(e.phase==="decompte" || e.phase==="mesure"){
+      this.corps.innerHTML='<div class="mes-gros">&nbsp;</div><div class="mes-sous">&nbsp;</div>'+
+        this.htmlPouls();
+      this.corps.appendChild(this.bouton("Arrêter",()=>this.evenement({type:"arret"})));
+      this.majChrono(ctx?ctx.currentTime:0);
+      return;
+    }
+    if(e.phase==="abandon"){
+      /* §8.1 invariant 3 — l'abandon ne produit AUCUNE note et AUCUNE entrée
+         au journal. Ce n'est pas une mauvaise note, c'est une mesure qui n'a
+         pas eu lieu. Même distinction qu'au §10.5. */
+      this.corps.innerHTML='<div class="mes-motif">Mesure abandonnée &middot; '+
+        echapper(e.motif||"gestes")+" &mdash; moins de "+GESTES_MIN+" gestes retenus. "+
+        "Rien n'est écrit au journal et aucune note n'est proposée : la carte revient "+
+        "à la notation manuelle.</div>";
+      this.sortie();
+      return;
+    }
+    if(e.phase==="bilan"){ this.rendreBilan(); return; }
+  },
+
+  rendreBilan(){
+    const b=this.bilan, c=this.carte;
+    if(!b){ this.corps.innerHTML=""; return; }
+    this.corps.innerHTML="";
+    rendreBarre(this.corps,{rho:b.st.rho, sigma_ms:b.st.sigma_locale_ms,
+      biais_ms:b.st.biais_ms, concluante:b.v, rhoPrecedent:b.rhoPrec,
+      plafonnee:b.np.plafonnee});
+
+    const info=document.createElement("div"); info.className="mes-pre";
+    info.textContent = b.st.n+" gestes \u00b7 tempo joué "+
+      (b.tj ? arrondi1(b.tj.bpm)+" bpm" : "\u2014")+" \u00b7 réglé "+b.regle+" bpm"+
+      (b.st.pct_cible!==null ? " \u00b7 "+arrondi1(b.st.pct_cible)+" % en cible" : "");
+    this.corps.appendChild(info);
+
+    if(b.np.discordante || b.np.plafonnee){
+      const d=document.createElement("div"); d.className="mes-pre";
+      d.textContent = (b.np.discordante
+        ? "Lecture discordante entre ρ et le % en cible : la plus basse des deux est proposée. "
+        : "")+(b.np.plafonnee
+        ? "Plafonné : « Acquis » demande trois prises concluantes au même contexte, pas une."
+        : "");
+      this.corps.appendChild(d);
+    }
+
+    const pre=document.createElement("div"); pre.className="mes-pre";
+    pre.textContent = b.np.note
+      ? "La mesure propose \u00ab "+LIBELLES_NOTE[b.np.note]+" \u00bb. À toi de valider, ou de changer."
+      : "Aucune note proposée. À noter à la main.";
+    this.corps.appendChild(pre);
+
+    const g=document.createElement("div"); g.className="notes";
+    NOTES.forEach((nom,q)=>{
+      const bt=document.createElement("button"); bt.dataset.q=q;
+      if(nom===b.np.note) bt.classList.add("pre");
+      bt.innerHTML=echapper((q+1)+" "+LIBELLES_NOTE[nom])+"<i>"+apercu(c,q)+"</i>";
+      bt.addEventListener("click",()=>this.valider(q));
+      g.appendChild(bt);
+    });
+    this.corps.appendChild(g);
+    this.corps.appendChild(this.bouton("Refaire la mesure",()=>{
+      this.etat=cycleInitial(); this.bilan=null; this.rendre();
+    }));
+  }
+};
+
 $("#calibrer").addEventListener("click",()=>Calibration.ouvrir());
 $("#calib-lancer").addEventListener("click",()=>Calibration.lancer());
 $("#calib-fermer").addEventListener("click",()=>Calibration.fermer());
@@ -2418,7 +2797,7 @@ function rendreExercice(c,hote,opts){
     '<div class="rang"><span class="etiquette e"></span><small class="reste"></small></div>'+
     '<div class="consigne"></div>'+
     '<div class="rythme" style="display:none"></div>'+
-    '<div class="gr"></div><div class="metro"></div><small class="chap"></small>'+
+    '<div class="gr"></div><div class="metro"></div><div class="mz"></div><small class="chap"></small>'+
     '<div class="critere" style="display:none"></div><div class="rz"></div>'+
     '<div class="avant"></div><div class="apres" style="display:none"></div>';
   hote.appendChild(w);
@@ -2430,6 +2809,29 @@ function rendreExercice(c,hote,opts){
   if(opts.grille && opts.grille.length)
     w.querySelector(".gr").innerHTML='<div class="grille">'+opts.grille.map(a=>"<span>"+echapper(a)+"</span>").join("")+"</div>";
   metronomeEmbarque(c,w.querySelector(".metro"));
+
+  /* §12.1 point 3 — la mesure se lance APRÈS le réglage du tempo et AVANT le
+     jugement : c'est l'ordre du §8, et l'emplacement le dit sans l'écrire. */
+  const mz=w.querySelector(".mz");
+  function poserLancement(){
+    mz.innerHTML="";
+    if(Mesure.estMesurable(c)){
+      const bm=document.createElement("button");
+      bm.className="b"; bm.style.marginTop="0"; bm.textContent="Mesurer 45 s";
+      bm.addEventListener("click",()=>Mesure.ouvrir(c,mz,
+        {noter:opts.noter, surFermeture:poserLancement}));
+      mz.appendChild(bm);
+    }else{
+      /* §3.2 — « L'app doit le dire sur la carte, pas le laisser deviner. » */
+      const d=document.createElement("div"); d.className="mes-hors";
+      d.textContent="Pas de mesure sur cette carte : l'attaque y est trop peu franche "+
+        "pour que la détection soit fiable (§3.2 — palm mute faible, hammer-on, pull-off). "+
+        "À noter à la main, comme avant.";
+      mz.appendChild(d);
+    }
+  }
+  poserLancement();
+
   w.querySelector(".chap").textContent = opts.sousTitre || (ch?ch.titre:"");
   const crit=w.querySelector(".critere"); crit.textContent=c.critere;
   const avant=w.querySelector(".avant"), apres=w.querySelector(".apres");
