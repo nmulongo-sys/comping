@@ -1724,6 +1724,76 @@ function stats(gestes, opts){
           sigma_locale_ms:sigma_locale_ms, rho:rho, pct_cible:100*dedans/n};
 }
 
+/* §9.2 — pas de grille réellement JOUÉ, le plus fin qui explique le jeu,
+   converti en bpm par la subdivision déclarée. Porté de analyse-attaque
+   v1.5 (fonction tempoJoue()) à l'identique, comme regrouper (§3.0) et pour
+   la même raison : une reconstitution qui collait aux données s'est déjà
+   révélée fausse une fois.
+
+   Il alimente le TROISIÈME garde-fou de concluante() (§9.1) et rien d'autre
+   — ni la note (§10.1), ni la barre, ni l'affichage du placement. Avant
+   l'étape 7e-0 il n'existait pas dans comping, et la condition « écart au
+   tempo réglé ≤ 3 % » était sautée SANS UN MOT : concluante() ne la teste
+   que si tempo_joue > 0. Une prise à +5 % — celle où B4/B5 montrent 5 à 7
+   tours de phase sur 30 s — ressortait concluante et recevait une note.
+
+   Deux pièges rencontrés successivement dans v1.5, que le port ne
+   redécouvre pas :
+     1. Ancrer la recherche sur l'intervalle MÉDIAN (v1.3) : dès que le jeu
+        mêle des valeurs rythmiques, la médiane glisse vers les courtes et
+        la pulsation sort de la plage. Session à 40 bpm, médiane 1067 ms,
+        réponse 58,7 bpm.
+     2. Balayer large à résolution fixe : à 1 s de période sur 117 s de jeu,
+        un pas de grille de 9 ms accumule 420 ms de dérive et le vrai
+        maximum est manqué.
+   D'où une estimation par ÉTAGES : grossière sur une portée courte, où la
+   résolution exigée est faible, puis affinée en élargissant la portée.
+
+   Le cache de v1.5 ne se porte pas — il servait une boucle d'affichage
+   plafonnée à 30 images/s (§12), et comping n'estime qu'une fois, au bilan. */
+function tempoJoue(gestes, subdivision){
+  const ev = gestes || [];
+  if(ev.length < 10) return null;          // jamais une estimation faite sur rien
+  if(!(subdivision > 0)) return null;      // subdivision absente : null, et on le dit
+  const ts = ev.slice(-150).map(g => g.temps_s);
+  const fin = ts[ts.length-1];
+  const R = (seg, p) => {
+    let C = 0, S = 0;
+    for(const t of seg){ const a = 2*Math.PI*t/p; C += Math.cos(a); S += Math.sin(a); }
+    return Math.hypot(C/seg.length, S/seg.length);
+  };
+  let court = ts.filter(t => t > fin - 20);
+  if(court.length < 8) court = ts.slice(-24);
+  if(court.length < 8) return null;
+  const pMax = Math.min(3.0, (court[court.length-1] - court[0])/4);
+  if(!(pMax > 0.2)) return null;
+
+  /* Étage grossier : balayage LOGARITHMIQUE de 0,2 s à pMax en 500 pas, sur
+     les 20 dernières secondes seulement — courte portée, donc peu de dérive
+     accumulée, donc résolution faible suffisante. */
+  const lr = Math.log(pMax/0.2);
+  let p = 0.2, meilleur = -1;
+  for(let i=0;i<500;i++){
+    const q = 0.2*Math.exp(lr*i/499), r = R(court, q);
+    if(r > meilleur){ meilleur = r; p = q; }
+  }
+  /* Deux affinages à ±6 % autour de p, en élargissant la portée : la
+     longueur du segment est ce qui donne la résolution, et elle n'est
+     exploitable qu'une fois la période approximativement connue. */
+  for(const portee of [60, Infinity]){
+    let seg = ts.filter(t => t > fin - portee);
+    if(seg.length < 8) seg = ts;
+    const larg = 0.06*p;
+    let bq = p, br = -1;
+    for(let i=0;i<=400;i++){
+      const q = p - larg + 2*larg*i/400, r = R(seg, q);
+      if(r > br){ br = r; bq = q; }
+    }
+    p = bq;
+  }
+  return {pas:p, R:R(ts,p), bpm:60/(p*subdivision)};
+}
+
 /* §9.1 — une mesure est concluante ou elle ne dit rien. Ordre des
    garde-fous : gestes, tempo, Rayleigh, accroche — le tempo AVANT Rayleigh,
    parce qu'une dérive de 5 % couche mécaniquement R et p (B4/B5 : 5 à 7
