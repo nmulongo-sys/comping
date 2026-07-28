@@ -2512,7 +2512,12 @@ const Mesure = {
       if(hist[i] && hist[i].concluante===true && memeQuadruplet(hist[i].quadruplet,quad)
          && typeof hist[i].rho==="number") rhoPrec=hist[i].rho;
 
-    this.bilan={st:st, tj:tj, v:v, quad:quad, np:np, rhoPrec:rhoPrec, pas:pas, regle:regle};
+    /* §12.1 point 6 — le relevé a besoin de ce que le journal ne garde pas :
+       l'étalement, le nombre de détections par geste, et les détections
+       brutes. On rejoue regrouper() sur le tampon, qui les porte tous. */
+    const detail = regrouper(this.tampon, FUSION_MS);
+    this.bilan={st:st, tj:tj, v:v, quad:quad, np:np, rhoPrec:rhoPrec, pas:pas, regle:regle,
+                gestes:detail, detections:this.tampon.slice()};
     this.rendre();
   },
 
@@ -2538,6 +2543,90 @@ const Mesure = {
       noter(c,q);
       suite(q);
     }
+  },
+
+  /* §12.1 point 6 — relevé détaillé, sur le modèle de celui de la calibration
+     (§2.4). Le journal du §11 ne garde que des agrégats : il compare des prises
+     entre elles, il n'instruit pas UNE prise. Quand la mesure rend un chiffre
+     qu'on ne s'explique pas — 140 bpm pour 70 réglés, point ouvert l — il faut
+     les instants, l'étalement et les détections brutes, et rien ne les gardait.
+     Ce texte ne va pas au journal et n'entre dans aucun calcul. */
+  releve(){
+    const b=this.bilan, c=this.carte, e=this.etat;
+    if(!b) return "";
+    const n1=x=>(typeof x==="number"&&isFinite(x))?(Math.round(x*10)/10):null;
+    const n3=x=>(typeof x==="number"&&isFinite(x))?(Math.round(x*1000)/1000):null;
+    const cal=calibrationCourante();
+    const L=[];
+    L.push("comping — relevé de mesure  "+new Date().toISOString());
+    L.push("");
+    L.push("CONTEXTE");
+    L.push("  carte          "+c.id+"  «"+c.titre+"»");
+    L.push("  tempo réglé    "+b.regle+" bpm   (cible "+c.bpmCible+")");
+    L.push("  preset         "+this.R.temps+"/4 · sub "+this.R.sub+
+           " · repere "+(this.R.repere||"tous")+" · swing "+!!this.R.swing+
+           " · gap "+(this.R.gap?(this.R.gapJouees+"/"+this.R.gapMuettes):"non")+
+           " · muet "+!!this.R.muet);
+    L.push("  échelon        "+echelonDe(c.preset)+"   (§7.4)");
+    L.push("  pas_grille     "+n1(b.pas*1000)+" ms      pas_clic  "+
+           (function(p){return p===null?"null (aucun clic régulier)":n1(p*1000)+" ms";})(
+             pasClic(b.regle, echelonDe(c.preset), this.R.temps, this.R.sub)));
+    L.push("  quadruplet     "+JSON.stringify(b.quad));
+    L.push("  ancre          "+n3(e.ancre)+" s      fin  "+n3(e.fin)+" s");
+    L.push("  détection      sens "+SENS_DETECTION+" · écart_min "+ECART_MIN_MS+
+           " ms · fusion "+FUSION_MS+" ms");
+    L.push("  calibration    "+(cal?(n1(cal.latence_ms)+" ms, dispersion "+
+           n1(cal.dispersion_ms)+" ms, "+cal.date):"aucune sur cet appareil"));
+    L.push("");
+    L.push("GRANDEURS (§9.2)");
+    L.push("  gestes         "+b.st.n+"        R  "+n3(b.st.R)+"        p  "+
+           (b.st.p===null?"—":b.st.p.toExponential(2)));
+    L.push("  σ_locale       "+n1(b.st.sigma_locale_ms)+" ms     σ_grille  "+
+           n1(b.st.sigma_grille_ms)+" ms");
+    L.push("  ρ              "+(b.st.rho===null?"—":n1(b.st.rho*100)+" %")+
+           "        % en cible  "+n1(b.st.pct_cible));
+    L.push("  biais          "+n1(b.st.biais_ms)+" ms (brut, non corrigé)");
+    L.push("  tempo joué     "+(b.tj?(n1(b.tj.bpm)+" bpm   période "+n1(b.tj.pas*1000)+
+           " ms   R "+n3(b.tj.R)):"non estimable"));
+    L.push("  verdict        "+(b.v.ok?"concluante":"NON concluante · "+b.v.motif));
+    L.push("  note proposée  "+(b.np.note||"aucune")+
+           (b.np.plafonnee?" (plafonnée)":"")+(b.np.discordante?" (discordante)":""));
+    L.push("");
+    L.push("GESTES  —  "+b.gestes.length+" retenus, temps relatifs à l'ancre");
+    L.push("    #      t(s)    IOI(ms)   écart_grille(ms)  étal(ms)  dét  dB");
+    let prec=null;
+    b.gestes.forEach(function(g,i){
+      const t=g.temps_s-e.ancre;
+      const ioi=prec===null?null:(g.temps_s-prec)*1000;
+      prec=g.temps_s;
+      let dev=null;
+      if(b.pas>0){
+        const k=Math.round(t/b.pas);
+        dev=(t-k*b.pas)*1000;
+      }
+      L.push("  "+String(i+1).padStart(3)+"  "+n3(t).toFixed(3).padStart(8)+
+             "  "+(ioi===null?"—":n1(ioi).toFixed(1)).padStart(8)+
+             "  "+(dev===null?"—":n1(dev).toFixed(1)).padStart(16)+
+             "  "+n1(g.etalement_ms).toFixed(1).padStart(8)+
+             "  "+String(g.detections).padStart(3)+
+             "  "+(g.intensite_db===undefined?"—":n1(g.intensite_db)));
+    });
+    L.push("");
+    L.push("DÉTECTIONS BRUTES  —  "+b.detections.length+" dans la fenêtre, relatives à l'ancre");
+    L.push("  (un geste de trop à mi-intervalle et un geste manquant ne se");
+    L.push("   distinguent pas sur les seuls gestes — d'où cette liste)");
+    const d=b.detections.map(x=>(x.temps_s-e.ancre).toFixed(3));
+    for(let i=0;i<d.length;i+=8) L.push("  "+d.slice(i,i+8).join("  "));
+    return L.join("\n");
+  },
+
+  copierReleve(bouton){
+    const t=this.releve();
+    if(!t) return;
+    const fini=m=>{ bouton.textContent=m; setTimeout(()=>bouton.textContent="Copier le détail",2000); };
+    try{
+      navigator.clipboard.writeText(t).then(()=>fini("Copié"),()=>fini("Sélectionne le texte"));
+    }catch(err){ fini("Sélectionne le texte"); }
   },
 
   /* ── rendus ───────────────────────────────────────────────────────────── */
@@ -2669,6 +2758,10 @@ const Mesure = {
     this.corps.appendChild(this.bouton("Refaire la mesure",()=>{
       this.etat=cycleInitial(); this.bilan=null; this.rendre();
     }));
+    /* §12.1 point 6 — sur le modèle du §2.4 : quand le verdict ne dit pas
+       POURQUOI, il faut pouvoir sortir la matière brute et la lire ailleurs. */
+    const cp=this.bouton("Copier le détail",()=>this.copierReleve(cp));
+    this.corps.appendChild(cp);
   }
 };
 
