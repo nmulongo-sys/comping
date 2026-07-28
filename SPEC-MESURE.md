@@ -1,5 +1,12 @@
 # comping — spécification du moteur de mesure intégré
 
+> Version 0.15 — 2026-07-28. Le §3.2 était écrit depuis le 27 et **aucune carte du corpus
+> ne le portait** : les 46 étaient `mesurable: true` par défaut, donc toutes recevaient le
+> bouton de mesure. Quatre passent à `false` — trois par le §3.2 (palm mute), une,
+> `crescendo`, par le point ouvert **k**, et cette quatrième est **conditionnelle** : elle
+> revient si la sensibilité est reprise. D'où un champ `carte.horsMesure` au §11, qui porte
+> le motif : dire « palm mute » sur une carte écartée pour sous-détection serait une
+> mention fausse, et le §3.2 demande de le **dire**, pas de le dire à peu près.
 > Version 0.14 — 2026-07-28. Étapes **7e-0** et **7e** livrées. `tempoJoue` est porté et
 > le garde-fou du §9.1 est effectivement alimenté (tests 20 à 22). Le branchement relie les
 > pièces que 7a, 7c, 7d et 7e-0 avaient déposées sans appelant, et le premier affichage réel
@@ -341,6 +348,34 @@ Mesuré, pas supposé :
 Ils restent des objets d'enseignement. Une carte qui les porte est marquée
 `mesurable: false` et ne reçoit **jamais** de note proposée : Jean note à la main, comme
 avant la fusion. L'app doit le dire sur la carte, pas le laisser deviner.
+
+**Ce que le corpus porte, arbitré le 2026-07-28.** La règle ci-dessus datait du 27 et
+**aucune carte ne la portait** : `mesurable` valait `true` partout par défaut, donc le
+bouton de mesure s'affichait sur les 46. Relevé en livrant 7e, quand le bouton est devenu
+visible. Quatre cartes passent à `mesurable: false`, et **pas toutes pour la même
+raison** :
+
+| Carte | Motif | Nature |
+|---|---|---|
+| `pm-base` | palm mute continu, paume au ras du chevalet | §3.2 — **structurel** |
+| `pm-alterne` | deux mesures étouffées, deux ouvertes | §3.2 — **structurel** |
+| `shuffle-mi` | riff en quintes, palm mute de bout en bout | §3.2 — **structurel**, et le swing est hors périmètre (§0) |
+| `crescendo` | quatre mesures du plus faible au plus fort | point ouvert **k** — **conditionnel** |
+
+`crescendo` n'est **pas** un cas du §3.2 : l'attaque y est franche, elle est seulement
+**faible** au départ. À sensibilité 2,5, B5 donnait 84 détections brutes pour 120 attaques
+jouées, et la sous-détection ne se corrige par aucun regroupement. Son exclusion tombe le
+jour où le point **k** est repris — c'est la seule des quatre dans ce cas, et c'est
+pourquoi le motif est **stocké sur la carte** et non déduit.
+
+`accent-1` a été examinée et **reste mesurable** : ses croches sont faibles mais
+constantes, sans le passage par le seuil que le crescendo impose. Si le compte tombe sous
+`GESTES_MIN`, l'app le dira — abandon, motif « gestes » —, ce qui est visible, contrairement
+à une mesure rendue sur la moitié des attaques.
+
+**Aucune carte du corpus ne porte de hammer-on ni de pull-off** : la seconde moitié du
+tableau ci-dessus ne concerne personne aujourd'hui. Elle reste écrite pour les chapitres
+à venir.
 
 ---
 
@@ -1038,6 +1073,7 @@ tempo réglé au moment de la prise, qui n'est plus disponible ensuite.
 |---|---|---|
 | `carte.mesurable` | `true` (§10.7 point 6) | vient du corpus, recopié par `fusionner()` comme les autres champs de contenu |
 | `carte.preset.muet` | `false` | porte l'échelon 5 (§7.4) |
+| `carte.horsMesure` | `null` | motif affiché quand `mesurable` est `false` (§3.2). Vient du corpus, recopié par `fusionner()` comme les autres champs de contenu. Il existe parce que les quatre cartes écartées ne le sont pas toutes pour la même raison : trois par le §3.2, une par le point ouvert **k**. Afficher « palm mute » sur la quatrième serait une mention **fausse**, et le §3.2 demande de le dire, pas de le dire à peu près. Absent ou `null` → la mention du §3.2 par défaut |
 
 **Aucun champ `carte.soutien`** : l'échelon se lit (§7.4).
 
@@ -1284,7 +1320,7 @@ branchement et rouges jusqu'à ce que le code existe (§13, règle inchangée) :
 | d | Ratio de swing dans `recalculer()` | chapitres 9–11, hors périmètre |
 | e | Habillage de timbre | conditionné à une prise vérifiant σ insensible au timbre |
 | g | Justification de `fusion_ms = 120` | **instruit, non clos** — voir §3.1. Ne peut pas se faire par comparaison au nombre d'attaques attendues ; à reprendre contre ρ, sur les seules prises où la détection est saine |
-| k | Sensibilité de 2,5 trop haute pour le jeu rapide et nuancé | B5 : 84 détections brutes pour 120 attaques jouées. La sous-détection ne se corrige par aucun regroupement. Conditionne la validité de toute mesure hors corde à vide |
+| k | Sensibilité de 2,5 trop haute pour le jeu rapide et nuancé | B5 : 84 détections brutes pour 120 attaques jouées. La sous-détection ne se corrige par aucun regroupement. Conditionne la validité de toute mesure hors corde à vide — **et, depuis le 2026-07-28, l'exclusion de `crescendo`** (§3.2) : c'est la seule des quatre cartes non mesurables dont le retour dépend de ce point |
 | h | Première calibration réelle | **clos et soldé** (§2.5) : **200 ms, dispersion 3 ms, 24/24, enregistrée le 2026-07-27** sur l'appareil de référence — bien au-dessus des 20 ms, le son passe par l'air |
 | i | σ de phase contre σ_locale (§4.4) | conditionne la colonne « % en cible » du §10.2 |
 | j | Consommateurs du §2.3 | **clos le 2026-07-28** par 7e. `calibrationCourante()` → `biaisAffichable()` → `rendreBarre()` → bilan de la carte de mesure : la chaîne a un appelant de bout en bout. Ouvert depuis le 27, il aura survécu à 7d — qui écrivait la règle sans la brancher — et c'est lui qui a fait nommer l'étape 7e |
