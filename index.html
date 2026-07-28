@@ -730,7 +730,12 @@ function C(id,ch,type,main,titre,consigne,critere,bpm,opts){
   const base = {bpm,temps:4,sub:1,swing:false,repere:"tous",gap:false,gapJouees:2,gapMuettes:2,
                 ramp:false,rampTous:8,rampPas:2,rampMax:bpm+30,muet:false};
   return {id,chapitre:ch,type,main,titre,consigne,critere,bpmCible:bpm,
-    rythme:opts.r||"",requiert:opts.req||[],preset:Object.assign(base,opts.p||{})};
+    rythme:opts.r||"",requiert:opts.req||[],preset:Object.assign(base,opts.p||{}),
+    /* §3.2 — hors mesure. `horsMesure` porte le MOTIF, parce que les quatre
+       cartes écartées ne le sont pas toutes pour la même raison : trois par le
+       §3.2 (palm mute), une par le point ouvert k (sous-détection du jeu
+       faible), et celle-là revient si k est repris. */
+    mesurable:opts.mesurable!==false, horsMesure:opts.horsMesure||null};
 }
 
 const CORPUS = [
@@ -873,23 +878,27 @@ const CORPUS = [
  /* ── Ch.5 · palm mute et dynamique ── */
  C("pm-base",5,"mediator","mediator","Palm mute",
    "Paume droite posée au ras du chevalet sur les trois cordes graves. Noires, médiator.",
-   "16 mesures, son court et sourd mais la note reste identifiable.",70,{req:["med-etouffe"]}),
+   "16 mesures, son court et sourd mais la note reste identifiable.",70,
+   {req:["med-etouffe"],mesurable:false,horsMesure:"Palm mute : l'accroche mesurée y tombe à 0,31 ou moins (§3.2). La régularité ne veut plus rien dire — à noter à la main."}),
  C("pm-alterne",5,"mediator","mediator","Mute et ouvert",
    "Deux mesures étouffées, deux mesures ouvertes, sans changer de tempo ni de volume.",
-   "8 alternances, la bascule est nette et tombe sur le 1.",70,{req:["pm-base"]}),
+   "8 alternances, la bascule est nette et tombe sur le 1.",70,
+   {req:["pm-base"],mesurable:false,horsMesure:"Palm mute : l'accroche mesurée y tombe à 0,31 ou moins (§3.2). La régularité ne veut plus rien dire — à noter à la main."}),
  C("accent-1",5,"rythme","mediator","Accent sur le 1 seul",
    "Croches continues à volume faible, sauf le premier temps, franchement accentué.",
    "16 mesures, l'écart de volume est audible sans que le tempo bouge.",75,{p:{sub:2},req:["croches"]}),
  C("crescendo",5,"rythme","mediator","Crescendo sur 4 mesures",
    "Quatre mesures de croches du plus faible au plus fort, puis retour immédiat au plus faible.",
-   "4 cycles, la progression est continue et le retour n'est pas un accident.",75,{p:{sub:2},req:["accent-1"]}),
+   "4 cycles, la progression est continue et le retour n'est pas un accident.",75,
+   {p:{sub:2},req:["accent-1"],mesurable:false,horsMesure:"Le crescendo part du plus faible : à la sensibilité actuelle, les premières attaques ne sont pas toutes détectées (point ouvert k). Mesurer une partie des gestes donnerait un chiffre crédible et faux — à noter à la main."}),
  C("hybride",5,"mediator","mediator","Hybride : médiator et doigts",
    "Médiator sur la basse, majeur et annulaire sur les deux cordes aiguës, simultanément. C'est ici que ton passé classique paie.",
    "16 mesures, basse et aigus sonnent ensemble et à volume comparable.",65,{req:["pm-base"]}),
  C("shuffle-mi",5,"piece","mediator","Shuffle en Mi",
    "Riff en quintes, palm mute, croches swinguées, médiator.",
    "3 grilles enchaînées à 90 bpm, l'étouffement tient du début à la fin.",90,
-   {p:{sub:2,swing:true,repere:"accent24"},req:["pm-alterne","accent-1","ar-vide"]})
+   {p:{sub:2,swing:true,repere:"accent24"},req:["pm-alterne","accent-1","ar-vide"],
+    mesurable:false,horsMesure:"Palm mute : l'accroche mesurée y tombe à 0,31 ou moins (§3.2). La régularité ne veut plus rien dire — à noter à la main."})
 ];
 
 /* ═══════════════════════════════════════════════════════════
@@ -905,7 +914,7 @@ function uid(){return "u"+Date.now().toString(36)+Math.random().toString(36).sli
 function carteNeuve(m){
   return Object.assign({},m,{statut:"neuf",ef:2.5,interval:0,due:null,reps:0,lapses:0,
     bpmTravail:m.bpmCible,bpmRecord:0,rappels:0,dernierVu:null,
-    mesurable:m.mesurable!==false});
+    mesurable:m.mesurable!==false, horsMesure:m.horsMesure||null});
 }
 function etatNeuf(){
   return {version:3,dureeSeance:25,
@@ -944,6 +953,7 @@ S.version=3;
     c.chapitre=m.chapitre; c.requiert=m.requiert; c.type=m.type; c.main=m.main;
     c.titre=m.titre; c.consigne=m.consigne; c.critere=m.critere;
     c.rythme=m.rythme; c.bpmCible=m.bpmCible; c.mesurable=m.mesurable!==false;
+    c.horsMesure=m.horsMesure||null;
     c.preset=Object.assign({},m.preset,{bpm:c.bpmTravail||m.preset.bpm});
     if(c.rappels===undefined) c.rappels=0;
     if(c.dernierVu===undefined) c.dernierVu=null;
@@ -2822,11 +2832,14 @@ function rendreExercice(c,hote,opts){
         {noter:opts.noter, surFermeture:poserLancement}));
       mz.appendChild(bm);
     }else{
-      /* §3.2 — « L'app doit le dire sur la carte, pas le laisser deviner. » */
+      /* §3.2 — « L'app doit le dire sur la carte, pas le laisser deviner. »
+         Le motif vient de la CARTE : les quatre cartes écartées ne le sont pas
+         toutes pour la même raison, et afficher « palm mute » sur celle qui
+         sort pour sous-détection serait une mention fausse. */
       const d=document.createElement("div"); d.className="mes-hors";
-      d.textContent="Pas de mesure sur cette carte : l'attaque y est trop peu franche "+
-        "pour que la détection soit fiable (§3.2 — palm mute faible, hammer-on, pull-off). "+
-        "À noter à la main, comme avant.";
+      d.textContent = c.horsMesure ||
+        ("Pas de mesure sur cette carte : l'attaque y est trop peu franche pour que la "+
+         "détection soit fiable (§3.2). À noter à la main, comme avant.");
       mz.appendChild(d);
     }
   }
