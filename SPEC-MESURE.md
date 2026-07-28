@@ -1135,7 +1135,7 @@ branchement et rouges jusqu'à ce que le code existe (§13, règle inchangée) :
 | 19 | Rejeu de T8 après le passage au palier | les séries d'origine restent distinctes : le palier élargit la comparabilité, il ne la casse pas |
 | 20 | `tempoJoue` sur une série synthétique à 90 bpm en croches, gigue de ρ = 6 % | bpm rendu à ±1 %, et `null` sous 10 gestes — jamais une estimation faite sur rien |
 | 21 | `tempoJoue` sur un jeu mêlant noires et croches à 40 bpm | la pulsation reste dans la plage : c'est le cas où l'intervalle médian de v1.3 répondait 58,7 bpm |
-| 22 | `concluante` appelée **sans** `tempo_joue` | le garde-fou du §9.1 ne peut plus être sauté en silence : l'appelant du branchement fournit toujours la grandeur, et le test le constate sur le chemin réel |
+| 22 | `tempoJoue` **puis** `concluante` sur une série jouée 5 % au-dessus du tempo réglé | motif « tempo », aucune note — la chaîne du chemin réel, et la seule preuve sous Node que le garde-fou est effectivement alimenté. La première rédaction de cette ligne visait l'appelant du branchement, qui ne se teste pas sous Node ; corrigée avant l'écriture des tests |
 
 ---
 
