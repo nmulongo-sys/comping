@@ -1,5 +1,19 @@
 # comping — spécification du moteur de mesure intégré
 
+> Version 0.13 — 2026-07-28. La lecture du code avant l'écriture de 7e a trouvé un
+> **garde-fou non alimenté** : le §9.1 exige que l'écart du tempo joué au tempo réglé
+> reste sous 3 %, et **rien dans `comping` ne produit ce tempo joué**. `tempoJoue()`
+> existe dans `analyse-attaque` v1.5 et n'a jamais été porté. La ligne écrite est
+> `if(o.tempo_regle > 0 && o.tempo_joue > 0 && …)` : sans la grandeur, la condition est
+> fausse et le garde-fou est **sauté sans un mot**. Une prise à +5 % — celle où B4/B5
+> montrent 5 à 7 tours de phase — serait déclarée concluante et recevrait une note, et
+> T5 testerait une règle que rien n'exécute. Aggravant : `concluante` est **stocké,
+> jamais recalculé** (§11), donc chaque entrée écrite avant le port porterait un verdict
+> rendu sous une règle plus faible, indistinguable des autres. D'où une étape **7e-0**
+> au §14, avant le branchement, et un §9.2 qui nomme l'origine de la grandeur. Le §12.1
+> consigne les trois décisions que 7e impose et que la spec ne tranchait pas : qui est la
+> cible du Moteur pendant la mesure, comment une détection devient un geste, où vit le
+> bouton.
 > Version 0.12 — 2026-07-28. Étape **7d** livrée : la géométrie de la barre (§10.4.1) est
 > pure et testée, et le §10.4.2 acte que ses quatre plages sont **construites** depuis les
 > bornes du §10.2 (`RHO_RANGS`) au lieu d'en être une seconde copie — la note aurait dit
@@ -687,11 +701,35 @@ deux finirait par bouger seul. Même discipline que `serieAcquise`, compteur uni
 | Nombre de gestes du passage retenu | ≥ `GESTES_MIN` (24) | **[P]** — lu depuis la constante du §8.1 depuis le 2026-07-28, plus écrit en clair |
 | Test de Rayleigh | p < 0,001 | **[É]** (déjà en place v1.3+) |
 | Accroche | R > 0,25 | **[É]** |
-| Écart du tempo joué au tempo réglé | ≤ 3 % | **[É]** — garde-fou du protocole. Au-delà, B4/B5 montrent 5 à 7 tours de phase sur 30 s : l'accroche s'effondre mécaniquement et la mesure ne dit plus rien du jeu. |
+| Écart du tempo joué au tempo réglé | ≤ 3 % | **[É]** — garde-fou du protocole. Au-delà, B4/B5 montrent 5 à 7 tours de phase sur 30 s : l'accroche s'effondre mécaniquement et la mesure ne dit plus rien du jeu. Alimenté par `tempoJoue()` depuis l'étape **7e-0** ; avant elle, **il ne l'était pas** — voir ci-dessous. |
 
 Une mesure non concluante n'affiche **ni biais, ni régularité, ni profil d'accentuation**,
 et ne propose **aucune note**. Elle affiche son motif de rejet, en clair, et la carte
 retourne à la notation manuelle.
+
+**Le garde-fou du tempo doit être alimenté, sinon il ment par omission** — relevé le
+2026-07-28, avant l'écriture de 7e. `concluante()` ne teste l'écart que si
+`o.tempo_joue > 0` ; appelée sans la grandeur, elle **saute la condition et renvoie
+`{ok:true}`** comme si elle l'avait vérifiée. Ce n'est pas une valeur par défaut
+prudente, c'est un quatrième garde-fou qui disparaît en silence — la forme de panne que
+la règle permanente du projet interdit, « quand une donnée manque, renvoyer `null` et le
+dire », et la cinquième de la série.
+
+Deux conséquences fixent l'ordre des travaux :
+
+1. **Le port précède le branchement** (§14, étape 7e-0). Brancher d'abord reviendrait à
+   écrire des entrées de journal sous une règle amputée.
+2. **Aucune reprise n'est possible après coup.** `concluante` est stocké et jamais
+   recalculé (§11), parce que le tempo réglé au moment de la prise n'est plus
+   disponible ensuite. Une entrée écrite sans le garde-fou reste fausse pour toujours,
+   et rien ne la distingue d'une entrée saine.
+
+**Pas de raccourci sur l'estimation.** Ancrer la recherche sur l'intervalle médian est
+exactement ce que faisait `analyse-attaque` v1.3, et c'est faux : dès que le jeu mêle
+des valeurs rythmiques, la médiane glisse vers les courtes et la pulsation sort de la
+plage — session à 40 bpm, médiane 1067 ms, réponse 58,7 bpm. Le port est **verbatim**,
+comme `regrouper` (§3.0) : une reconstitution qui colle aux données s'est déjà révélée
+fausse une fois.
 
 ### 9.2 Grandeurs calculées
 
@@ -708,6 +746,15 @@ Statistique circulaire sur les phases `2π · dev / pas_grille`, déjà impléme
 - **ρ = σ_locale / pas_grille** — dispersion relative, la seule grandeur comparable d'un
   tempo à l'autre. Référence mesurée : **ρ ≈ 6 %, stable de 333 à 1000 ms** **[É]**.
 - **% en cible** — part des gestes dans ±FEN, centré sur le biais.
+- **tempo joué** — période réellement jouée, convertie en bpm par la subdivision
+  déclarée. **Portée de `analyse-attaque` v1.5, fonction `tempoJoue()`, étape 7e-0.**
+  Estimation par étages et non par intervalle médian : balayage logarithmique grossier
+  sur une portée courte (500 pas de 0,2 s à `pMax`), puis deux affinages à ±6 % en
+  élargissant la portée à 60 s puis à tout le passage. Les deux pièges sont documentés
+  dans le source d'origine et le port ne les redécouvre pas — l'ancrage médian (v1.3) et
+  le balayage large à résolution fixe, qui manque le vrai maximum par accumulation de
+  dérive. Elle ne nourrit **que** le garde-fou du §9.1 : ni la note (§10.1), ni la barre,
+  ni l'affichage du placement.
 
 ### 9.3 Le biais s'affiche, il ne se note pas
 
@@ -1000,6 +1047,58 @@ bord de la règle de notation elle-même.
   visuel de la fusion est nul.
 - `prefers-reduced-motion` respecté, cibles ≥ 44 px.
 
+### 12.1 Décisions d'implémentation — étape 7e (branchement)
+
+Trois points que la spec ne tranchait pas et que le câblage impose. Consignés ici plutôt
+que dans un commentaire de code : un choix arbitré dans le code seul redevient une
+question au fil suivant.
+
+1. **La carte de mesure devient la cible du Moteur, elle ne se greffe pas sur celle du
+   métronome embarqué.** `Moteur.cible` est unique — `demarrer()` l'écrase, `arreter()`
+   la met à `null` — et le métronome de l'exercice l'occupe déjà. Deux consommateurs
+   auraient demandé une diffusion à plusieurs cibles, donc une notion nouvelle dans le
+   Moteur, pour la durée d'une carte. La mesure prend donc la main : elle démarre le
+   Moteur sur le preset de la carte, dessine son propre décompte, et **rend la main en
+   sortant**, quel que soit le chemin de sortie — bilan, abandon ou fermeture.
+
+   Le tap reste celui du §8.2 point 1 : `cible.surTemps(ev)`, alimenté par `Moteur.file`
+   dans `boucle()`. Vérifié à la lecture, et c'est ce qui rend le branchement correct :
+   `boucle()` ne filtre **pas** sur `muet`, et livre `{temps, sub, t, muet, mesure}` pour
+   toute position à `sub === 0`, y compris les temps 1 qui ne sonnent pas à
+   `repere:"seuls24"` et les mesures muettes du mode gap.
+
+2. **Une détection devient un geste par `regrouper`, jamais par un second groupeur.**
+   `regrouper` prend une liste et le cycle attend un évènement : la tentation est
+   d'écrire un groupeur en flux à côté. Deux implémentations de la même règle divergent,
+   et la divergence serait muette.
+
+   Le branchement garde donc un **tampon des détections reçues depuis l'ancre**, appelle
+   `regrouper(tampon, FUSION_MS)` à chaque détection, et n'émet `{type:"geste", t}` que
+   pour les groupes **nouvellement apparus**, au temps de leur chef. C'est exact parce
+   que le groupement est **causal** : le chef d'un groupe est sa première détection et
+   son temps ne change jamais quand le groupe s'allonge. Seuls `etalement_ms` et
+   `intensite_db` sont révisés a posteriori, et le cycle ne stocke que `temps_s`
+   (§8.2 point 3).
+
+   Nourrir le cycle en **détections brutes** est l'erreur que cette règle écarte :
+   `tests/fixtures/attaques-2026-07-27-02-19-28.json` donne 82 détections pour 52 gestes.
+   `GESTES_MIN` serait franchi à 60 % du compte réel, et `stats()` compterait plusieurs
+   fois la même attaque.
+
+   Le tampon **repart de zéro à l'ancre** : le groupement porte sur la fenêtre mesurée,
+   pas sur le flux depuis l'ouverture de la carte. Un geste à cheval sur l'ancre est donc
+   coupé — conséquence assumée, et cohérente avec l'invariant 2 du §8.1, qui ne retient
+   rien avant l'ancre.
+
+3. **Le bouton vit dans `rendreExercice`, sous le métronome, avant « Voir le critère ».**
+   La mesure se lance après le réglage du tempo et avant le jugement : c'est l'ordre du
+   §8, et l'emplacement le rend sans le dire. Il n'apparaît **que** sur une carte
+   `mesurable`.
+
+   Sur une carte `mesurable: false`, l'emplacement porte à la place une mention qui dit
+   pourquoi il n'y a pas de mesure. Le §3.2 l'exige littéralement — « L'app doit le dire
+   sur la carte, pas le laisser deviner » — et rien ne l'affichait jusqu'ici.
+
 ---
 
 ## 13. Tests d'acceptation
@@ -1034,6 +1133,9 @@ branchement et rouges jusqu'à ce que le code existe (§13, règle inchangée) :
 | 17 | `positionBarre` aux cinq points remarquables du §10.4.1 | 0 · 0,444 · 0,667 · 0,833 · 1, et `null` sur ρ non fini |
 | 18 | `echelonDe` sur les six lignes du tableau du §7.4 | l'échelon annoncé, pour chacune |
 | 19 | Rejeu de T8 après le passage au palier | les séries d'origine restent distinctes : le palier élargit la comparabilité, il ne la casse pas |
+| 20 | `tempoJoue` sur une série synthétique à 90 bpm en croches, gigue de ρ = 6 % | bpm rendu à ±1 %, et `null` sous 10 gestes — jamais une estimation faite sur rien |
+| 21 | `tempoJoue` sur un jeu mêlant noires et croches à 40 bpm | la pulsation reste dans la plage : c'est le cas où l'intervalle médian de v1.3 répondait 58,7 bpm |
+| 22 | `concluante` appelée **sans** `tempo_joue` | le garde-fou du §9.1 ne peut plus être sauté en silence : l'appelant du branchement fournit toujours la grandeur, et le test le constate sur le chemin réel |
 
 ---
 
@@ -1085,14 +1187,28 @@ branchement et rouges jusqu'à ce que le code existe (§13, règle inchangée) :
    `calibrationCourante()` est exposée depuis le 2026-07-27 et n'a toujours aucun appelant.
    Seul morceau qui touche vraiment l'écran.
 
+   **7e-0 — tempo joué (port de v1.5).** Étape **ajoutée le 2026-07-28**, à la lecture du
+   code qui précède 7e, et **bloquante pour elle**. `concluante` porte quatre garde-fous
+   (§9.1) et le troisième n'est alimenté par rien : `tempoJoue()` n'a jamais été porté.
+   Sans lui la condition est sautée **sans erreur visible**, et comme `concluante` est
+   stocké et jamais recalculé (§11), les entrées écrites entre-temps resteraient fausses
+   pour toujours. Fonction **pure** : elle entre dans le bloc extrait et dans `EXPORTES`,
+   et la règle « tests avant code » du §13 s'y applique pleinement — contrairement à 7e.
+   Port **verbatim**, comme `regrouper` ; le cache d'estimation de v1.5 ne se porte pas,
+   il servait une boucle d'affichage et `comping` n'estime qu'une fois, au bilan.
+
    **7e — branchement (plomberie).** Étape **ajoutée le 2026-07-28**, à l'écriture de 7d :
    7a, 7c et 7d déposent chacun des pièces qui n'ont **aucun appelant** —
    `enregistrerMesure`, `historiqueDe`, `cycleMesure`, `rendreBarre`. C'est le même défaut
    que le point ouvert **j** reprochait à `calibrationCourante()`, et le nommer vaut mieux
    que le laisser se répéter. 7e est ce qui les relie : file d'ordonnancement du Moteur
    (§8.2 point 1) → `cycleMesure` → `stats` → `concluante` → `noteProposee` → barre et
-   note pré-cochée → `enregistrerMesure`. Rien de neuf à décider : que du câblage, et il
-   ne se teste pas sous Node.
+   note pré-cochée → `enregistrerMesure`. Que du câblage, et il ne se teste pas sous
+   Node — mais **pas « rien à décider »** : la rédaction du 2026-07-28 le disait, et la
+   lecture du code a trouvé trois points que la spec ne tranchait pas. Ils sont au
+   §12.1 : qui est la cible du Moteur pendant la mesure, comment une détection devient un
+   geste, où vit le bouton. Il reste à écrire deux morceaux d'interface : la carte de
+   mesure (présentation → décompte → 45 s → bilan) et le bouton qui la lance.
 
 ---
 
