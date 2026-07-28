@@ -1,5 +1,14 @@
 # comping — spécification du moteur de mesure intégré
 
+> Version 0.16 — 2026-07-28. Première prise réelle, et la mesure rend **140 bpm pour 70
+> réglés** — exactement le double. Trois hypothèses ont été écartées **par la
+> reproduction** : la régularité du jeu (l'estimation est stable jusqu'à gigue nulle), la
+> sous-détection (le tempo reste juste à 45 % d'attaques manquées), et la subdivision jouée
+> (Jean a joué une attaque par clic). La cause est dans les données, et **le journal ne les
+> garde pas** : il ne porte que des agrégats. Même situation qu'au point ouvert **h**, où
+> le verdict seul ne disait pas pourquoi la calibration échouait. D'où un **relevé détaillé
+> du bilan** (§12.1 point 6), sur le modèle de celui de la calibration, et un nouveau point
+> ouvert **l**.
 > Version 0.15 — 2026-07-28. Le §3.2 était écrit depuis le 27 et **aucune carte du corpus
 > ne le portait** : les 46 étaient `mesurable: true` par défaut, donc toutes recevaient le
 > bouton de mesure. Quatre passent à `false` — trois par le §3.2 (palm mute), une,
@@ -1190,6 +1199,33 @@ question au fil suivant.
    forcé à `false`, et n'y touche pas d'ici la fin. Le mode progressif reste ce qu'il
    est **hors** mesure : c'est un outil d'entraînement, pas un régime de prise.
 
+6. **Le bilan porte un relevé détaillé, copiable.** Imposé par la première prise réelle
+   du 2026-07-28 : la mesure a rendu 140 bpm pour 70 réglés, et **rien dans l'app ne
+   permettait de savoir pourquoi**. Le journal du §11 ne garde que des agrégats — ρ, R,
+   le compte de gestes — parce qu'il est fait pour comparer des prises entre elles, pas
+   pour instruire une prise. Les instants, l'étalement, le nombre de détections par
+   geste : rien de tout cela n'était conservé, et c'est exactement ce qu'il fallait lire.
+
+   Précédent direct : le point ouvert **h**. Tant qu'aucune calibration ne passait, le
+   verdict seul ne disait pas *pourquoi*, et le §2.4 a répondu par un relevé détaillé
+   avec un bouton « copier ». Le bilan reçoit le même, pour la même raison.
+
+   Le relevé porte, en texte brut :
+
+   - **le contexte** — carte, tempo réglé, preset complet, pas de grille, échelon,
+     quadruplet, ancre et fin, présence d'une calibration, et les trois paramètres de
+     détection (sensibilité, écart minimum, `fusion_ms`) ;
+   - **les grandeurs** — celles du §9.2, plus le triplet rendu par `tempoJoue` (période,
+     R, bpm), qui ne figure nulle part ailleurs ;
+   - **les gestes**, un par ligne : instant relatif à l'ancre, intervalle depuis le
+     précédent, écart à la grille, étalement, nombre de détections regroupées ;
+   - **les détections brutes**, relatives à l'ancre, pour qu'on puisse voir ce que
+     `regrouper` a fait — un geste de trop au milieu d'un intervalle et un geste manquant
+     ne se distinguent pas sur les seuls gestes.
+
+   Il n'est **pas** écrit au journal et ne participe à aucun calcul : c'est un outil
+   d'instruction, pas une donnée du modèle. Il vit le temps d'un bilan.
+
 ---
 
 ## 13. Tests d'acceptation
@@ -1324,6 +1360,7 @@ branchement et rouges jusqu'à ce que le code existe (§13, règle inchangée) :
 | h | Première calibration réelle | **clos et soldé** (§2.5) : **200 ms, dispersion 3 ms, 24/24, enregistrée le 2026-07-27** sur l'appareil de référence — bien au-dessus des 20 ms, le son passe par l'air |
 | i | σ de phase contre σ_locale (§4.4) | conditionne la colonne « % en cible » du §10.2 |
 | j | Consommateurs du §2.3 | **clos le 2026-07-28** par 7e. `calibrationCourante()` → `biaisAffichable()` → `rendreBarre()` → bilan de la carte de mesure : la chaîne a un appelant de bout en bout. Ouvert depuis le 27, il aura survécu à 7d — qui écrivait la règle sans la brancher — et c'est lui qui a fait nommer l'étape 7e |
+| l | Tempo joué rendu au double du tempo réglé sur la première prise réelle | **ouvert le 2026-07-28.** 140 bpm pour 70 réglés, jeu déclaré à une attaque par clic. Trois causes écartées par reproduction : régularité du jeu, sous-détection (le tempo reste juste à 45 % d'attaques manquées), subdivision jouée plus fine. Restent deux pistes non départagées : des **gestes en trop à mi-intervalle** — un accord étalé au-delà de `fusion_ms` ouvre un second geste au milieu, ce qui est une grille deux fois plus fine —, et des **creux périodiques** liés au mode trous de la carte. Le relevé du §12.1 point 6 existe pour trancher. Tant qu'il n'est pas tranché, **le garde-fou du tempo peut rejeter une prise saine** |
 | f | Origine des doublons à 59–75 ms | **tranché** : redéclenchement sur la résonance du corps à la sortie du temps réfractaire, pas le balayage des cordes — un accord plaqué ne produit que 1,1 détection par geste. `fusion_ms = 120` les absorbe. |
 
 ---
