@@ -1099,6 +1099,27 @@ question au fil suivant.
    pourquoi il n'y a pas de mesure. Le §3.2 l'exige littéralement — « L'app doit le dire
    sur la carte, pas le laisser deviner » — et rien ne l'affichait jusqu'ici.
 
+4. **La barre de mesure porte la classe `barre`, la jauge de séance est renommée
+   `jauge-bloc`.** Relevé en écrivant 7e, et c'est le genre de défaut que seul le premier
+   affichage réel révèle : `rendreBarre` posait `class="barre"` sur son conteneur, et la
+   feuille de style portait **déjà** une règle `.barre` — celle de la jauge de progression
+   du bloc de séance, `height:4px; overflow:hidden`. Les deux sélecteurs ont la même
+   spécificité ; la règle de 7d n'ajoutait qu'un `margin-top`, donc la hauteur de 4 px et
+   le `overflow:hidden` de la jauge s'appliquaient à la barre de mesure. Piste de 26 px,
+   légendes, σ, ρ et la ligne de placement : **tout était rogné dans un ruban de 4 px**,
+   sans une erreur, sans un avertissement.
+
+   C'est la même famille que le point ouvert **j** et que le garde-fou du §9.1 : une
+   pièce écrite, testée sur ce qui se teste, et fausse dès qu'un consommateur arrive.
+   `positionBarre` et ses cinq points remarquables restaient justes au chiffre près
+   pendant que rien n'était visible.
+
+   La barre de mesure garde `barre` — c'est le mot de la spec (§10.4, `PLAGES_BARRE`,
+   `positionBarre`, « la barre » partout) — et la jauge de séance, qui n'était nommée
+   nulle part, prend `jauge-bloc`, dans la famille de `#calib-jauge`. Les classes
+   introduites par la carte de mesure sont toutes préfixées `mes-`, pour que la
+   prochaine ne se pose pas.
+
 ---
 
 ## 13. Tests d'acceptation
