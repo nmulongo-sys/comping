@@ -55,7 +55,8 @@ const EXPORTES_ETAPE_7 = [
   "quadrupletDe", "palierTempo", "echelonDe",           // 7b · §6.1, §6.2, §7.4
   "cycleInitial", "cycleMesure",                        // 7c · §8.1
   "DUREE_MESURE_S", "MESURES_DECOMPTE", "GESTES_MIN",   // 7c · constantes
-  "positionBarre", "PLAGES_BARRE"                       // 7d · §10.4.1
+  "positionBarre", "PLAGES_BARRE",                      // 7d · §10.4.1
+  "tempoJoue"                                           // 7e-0 · §9.2
 ];
 
 const TOUS = EXPORTES.concat(EXPORTES_ETAPE_7);
