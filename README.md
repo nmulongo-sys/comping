@@ -6,7 +6,7 @@ révision — en découle.
 
 **En ligne** : https://nmulongo-sys.github.io/comping/
 **Statut** : Passe 2.2 — séance autonome sur un seul écran, piste médiator, chapitres, récursivité. Fichier HTML unique, aucune dépendance, fonctionne hors ligne.
-**En chantier** : moteur de mesure du jeu (calibration de latence, détection d'attaques, note proposée). Spécifié dans `SPEC-MESURE.md`, étapes 1 à 5 livrées, pas encore branché dans l'interface.
+**Moteur de mesure** : **branché** depuis le 2026-07-28. Une carte mesurable porte un bouton « Mesurer 45 s » qui écoute le jeu au micro, en tire régularité et placement, et **propose** une note que Jean valide. Spécifié dans `SPEC-MESURE.md` (v0.15), étapes 1 à 7e livrées. Reste ouverte l'étape 6 — fenêtre en cible relative —, conditionnée à une seconde série de capture.
 
 ## Utilisation
 
@@ -26,7 +26,10 @@ Cinq onglets :
   silencieux, tempo progressif, tap tempo. Verrouillage de veille écran.
 - **Cartes** — file de révision espacée. **Chaque exercice embarque son propre
   métronome**, déjà réglé (mesure, subdivision, swing, accents, trous, rampe) ; le
-  tempo de travail est mémorisé par carte.
+  tempo de travail est mémorisé par carte. Sous le métronome, **« Mesurer 45 s »**
+  lance une prise : deux mesures de décompte, quarante-cinq secondes de jeu, puis un
+  bilan — barre graduée, placement, note pré-cochée. La note reste modifiable en un
+  geste ; l'app ne l'applique jamais seule.
 - **Journal** — historique, série de jours consécutifs, état de l'entretien, export JSON,
   et **calibration de latence** de l'appareil (« Calibrer cet appareil »). Calibrer est une
   opération unique par appareil, d'où l'absence de sixième onglet.
@@ -171,14 +174,18 @@ chargées depuis Google Fonts avec repli système — l'app reste fonctionnelle 
 seule la typographie dégrade. Mobile d'abord : onglets bas fixes, cibles tactiles ≥ 44 px,
 `prefers-reduced-motion` respecté, focus clavier visible.
 
-## Moteur de mesure (en chantier)
+## Moteur de mesure
 
 `comping` mesure le jeu et **propose** une note ; il ne la décide pas. Cette phrase
 gouverne tout le reste du moteur.
 
-**`SPEC-MESURE.md` est le document qui fait autorité** (v0.8). Le code ne le précède
+**`SPEC-MESURE.md` est le document qui fait autorité** (v0.15). Le code ne le précède
 jamais : spec d'abord, tests ensuite, code en dernier. Un test rouge tant que la fonction
-n'existe pas n'est pas une panne — c'est l'ordre de marche.
+n'existe pas n'est pas une panne — c'est l'ordre de marche. Sur le branchement final, la
+seconde moitié de la règle ne mord plus : minuteries, micro et écritures d'écran ne se
+testent pas sous Node. La première tient toujours — toute décision passe par la spec
+d'abord, et les deux fois où elle a été prise dans le code sont **signalées comme telles**
+dans la spec (§12.1 point 5, §9.1).
 
 ### Calibration de latence (§2)
 
@@ -296,6 +303,86 @@ Deux règles de sûreté encadrent la table :
   Sinon un micro qui décroche devient une punition, et l'historique enregistre un échec
   qui n'a pas eu lieu.
 
+### Tempo joué (§9.2)
+
+`tempoJoue(gestes, subdivision)` rend le pas de grille **réellement joué** — le plus fin
+qui explique le jeu — converti en bpm. Porté verbatim de `analyse-attaque` v1.5, comme
+`regrouper` et pour la même raison : une reconstitution qui collait aux données s'est
+déjà révélée fausse.
+
+Il alimente le **troisième garde-fou** du §9.1, et rien d'autre. Avant le 2026-07-28 il
+n'existait pas dans `comping` : `concluante()` ne teste l'écart de tempo que si
+`tempo_joue > 0`, donc appelée sans la grandeur elle **sautait la condition en silence**.
+Une prise à +5 % ressortait concluante et recevait une note. Comme le verdict est
+**stocké et jamais recalculé**, les entrées écrites avant le port seraient restées
+fausses pour toujours — d'où le port avant le branchement, et non après.
+
+L'estimation se fait **par étages** : balayage logarithmique grossier sur une portée
+courte, puis deux affinages à ±6 % en élargissant la portée. Ancrer sur l'**intervalle
+médian** est ce que faisait v1.3, et c'est faux : dès que le jeu mêle des valeurs, la
+médiane glisse vers les courtes et la pulsation sort de la plage — session à 40 bpm,
+médiane 1067 ms, réponse 58,7 bpm.
+
+### Cycle d'une carte mesurée (§8)
+
+`presentation → decompte → mesure → bilan | abandon`, écrit en **réducteur pur** :
+`cycleMesure(etat, evt) → etat′`, sans DOM, sans `window`, sans `ctx`, sans `S`. Il entre
+donc dans le bloc extrait et se teste sous Node comme le reste. La transition est
+**totale** : un évènement inattendu renvoie l'état inchangé, jamais d'exception.
+
+Deux pièges que le code fixe et qu'il ne faut pas redécouvrir :
+
+- **Les clics se prennent dans `Moteur.file`, jamais à la sortie de `Moteur.clic()`.** À
+  `repere:"seuls24"`, le temps 1 **ne sonne pas** — `clic()` écarte tout ce qui n'est ni 2
+  ni 4 avant d'émettre. Branché sur les clics audibles, l'ancre ne se poserait **jamais**
+  sur ces cartes, et sans erreur : la carte resterait en décompte indéfiniment.
+- **Le décompte part du premier temps 1 *vu*, pas du premier clic reçu**, et la
+  comparaison est `>=`, pas `===`. Le Moteur tourne déjà quand la carte s'ouvre. Avec
+  `===`, un temps 1 perdu empêcherait l'ancre de se poser **définitivement**.
+
+`abandon` — moins de 24 gestes — ne produit **aucune note et aucune entrée au journal** :
+ce n'est pas une mauvaise note, c'est une mesure qui n'a pas eu lieu.
+
+### Barre graduée et carte de mesure (§10.4, §12.1)
+
+Le bilan affiche une barre de 12 % à gauche à 3 % à droite, quatre plages **construites**
+depuis les bornes de la table de notation — une seule table, lue deux fois. Écrites deux
+fois, la note aurait dit « Bien » pendant que le trait se posait dans « En progrès », sans
+que rien ne dise laquelle a tort. Un pointillé marque « ton habitude » (6 %), un marqueur
+fantôme la précédente prise **au même quadruplet**, absent s'il n'y en a pas — jamais un
+zéro par défaut, qui se lirait « très dispersé ».
+
+Quatre décisions de plomberie, prises au branchement :
+
+- **La mesure prend le Moteur.** Il n'a qu'une cible et le métronome embarqué l'occupe ;
+  la mesure la lui prend, dessine son propre décompte, et la rend en sortant — bilan,
+  abandon ou fermeture.
+- **Le tempo est gelé** (`ramp: false`) pendant la prise. En mode progressif,
+  `bpmTravail` dérive et `pas_grille` avec lui : la grille bougerait pendant les 45 s
+  qu'elle sert à mesurer.
+- **Une détection devient un geste par `regrouper`, jamais par un second groupeur.** Le
+  branchement garde un tampon des détections depuis l'ancre et n'émet que les groupes
+  **nouveaux** — le chef d'un groupe est sa première détection, son temps ne change plus.
+  Nourrir le cycle en détections brutes donnerait 82 gestes là où il y en a 52.
+- **Le bouton vit sous le métronome, avant « Voir le critère ».** La mesure se lance après
+  le réglage du tempo et avant le jugement : c'est l'ordre du §8, et l'emplacement le dit
+  sans l'écrire.
+
+### Cartes hors mesure (§3.2)
+
+Quatre cartes portent `mesurable: false` et affichent, à la place du bouton, **le motif de
+leur exclusion** — champ `horsMesure`, parce que les raisons diffèrent :
+
+| Carte | Motif | Nature |
+|---|---|---|
+| `pm-base`, `pm-alterne`, `shuffle-mi` | palm mute, accroche mesurée ≤ 0,31 | structurel |
+| `crescendo` | jeu faible au départ, sous-détection à la sensibilité actuelle | **conditionnel** |
+
+`crescendo` redeviendra mesurable le jour où la sensibilité de détection sera reprise.
+C'est la seule des quatre dans ce cas, et c'est pourquoi le motif est **stocké sur la
+carte** au lieu d'être déduit : afficher « palm mute » sur une carte écartée pour
+sous-détection serait une mention fausse.
+
 ### Bloc de fonctions pures, et son extraction
 
 Les fonctions du moteur vivent dans `index.html`, entre les marqueurs
@@ -312,7 +399,7 @@ frontière.
 ### Tests
 
 ```
-node tests/mesure-tests.js        # 21 tests — moteur de mesure
+node tests/mesure-tests.js        # 39 tests — moteur de mesure
 node tests/calibration-tests.js   # 23 tests — calibration
 ```
 
@@ -326,6 +413,37 @@ Deux tests n'y figurent pas et le resteront tant qu'il n'y aura pas de banc audi
 navigateur : le worklet sur signal synthétique, et la boucle acoustique de bout en bout.
 
 ## Journal de développement
+
+### 2026-07-28 — Le moteur est branché (étapes 7a à 7e)
+
+- **Le moteur de mesure a un appelant.** Jusqu'ici chaque étape déposait des pièces
+  correctes et **sans consommateur** : le cycle, la barre, le journal des mesures, le
+  masquage du biais. Une carte mesurable porte désormais un bouton « Mesurer 45 s » qui
+  mène de la présentation au bilan, écrit au journal à la validation, et rend la main.
+- **Un garde-fou n'était alimenté par rien.** Le §9.1 exige que le tempo joué reste à
+  ≤ 3 % du tempo réglé, et `tempoJoue()` n'avait **jamais été porté** depuis
+  `analyse-attaque` v1.5. `concluante()` ne teste l'écart que si la grandeur est fournie :
+  sans elle, elle **sautait la condition sans un mot**. Une prise à +5 % — celle où
+  l'accroche s'effondre mécaniquement — ressortait concluante et recevait une note. Porté
+  **avant** le branchement, parce que le verdict est stocké et jamais recalculé : les
+  entrées écrites entre-temps seraient restées fausses pour toujours. Tests 20 à 22.
+- **La barre n'était pas visible.** Elle portait `class="barre"`, et la feuille de style
+  avait **déjà** une règle `.barre` — la jauge de progression du bloc de séance,
+  `height: 4px; overflow: hidden`. Piste, légendes, σ, ρ et placement : tout était rogné
+  dans un ruban de quatre pixels, sans erreur. La géométrie restait juste au chiffre près
+  pendant que rien ne s'affichait. La jauge de séance est renommée `jauge-bloc` ; les
+  classes de la carte de mesure sont préfixées `mes-`.
+- **Le §3.2 était écrit et personne ne le portait.** Les 46 cartes étaient mesurables par
+  défaut, donc le bouton s'affichait partout, y compris sur le palm mute que la spec met
+  explicitement hors mesure depuis la veille. Quatre cartes marquées, avec leur motif.
+- **Deux décisions prises dans le code et non dans la spec** — tempo gelé pendant la
+  prise, cinquième motif de rejet `tempo indéterminable`. Contraires à l'ordre de marche,
+  consignées après coup et **signalées comme telles** dans la spec.
+- Point ouvert **j** — « la règle du masquage du biais est écrite, rien ne l'appelle » —
+  **clos** : la chaîne a un appelant de bout en bout. Ouvert depuis le 27, il aura
+  survécu à l'étape qui écrivait la règle sans la brancher, et c'est lui qui a fait
+  nommer l'étape 7e.
+- Suites à **39 / 0** et **23 / 0**, rejouées depuis le dépôt.
 
 ### 2026-07-28 — `pasClic` : les deux points posés par le code sont arbitrés
 - Deux comportements que le code avait fixés seuls, faute d'arbitrage, et qui se sont
