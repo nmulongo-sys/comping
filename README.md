@@ -143,7 +143,7 @@ sont affichés mais sans cartes ; ils annoncent la suite du programme.
 
 Les pièces des chapitres ouverts sont des **formes traditionnelles ou du domaine
 public** (blues 12 mesures, « Ah ! vous dirai-je, maman », « Scarborough Fair »,
-« House of the Rising Sun », shuffle en Mi). Les chapitres avancés renvoient au recueil
+« When the Saints », « House of the Rising Sun », shuffle en Mi). Les chapitres avancés renvoient au recueil
 personnel de l'utilisateur : l'app ne reproduit aucune partition sous droits.
 
 ### Piste médiator
@@ -165,7 +165,7 @@ trou : `↓ ↓↑ ·↑ ↓↑`.
 Portés par les chapitres, de 0 à 6 : 0 socle mécanique · 1 accords ouverts et prise du
 médiator · 2 aller-retour, syncope, dynamique · 3 barrés et shell voicings ·
 4 Freddie Green et comping · 5 drop 2 / drop 3 · 6 modes et improvisation.
-Chapitres 0 à 5 peuplés (46 cartes) ; 6 à 11 déclarés avec leur pièce, sans cartes.
+Chapitres 0 à 6 peuplés (49 cartes) ; 7 à 12 déclarés avec leur pièce, sans cartes.
 
 ### Style
 
@@ -413,6 +413,33 @@ Deux tests n'y figurent pas et le resteront tant qu'il n'y aura pas de banc audi
 navigateur : le worklet sur signal synthétique, et la boucle acoustique de bout en bout.
 
 ## Journal de développement
+
+### 2026-07-28 — Audit du corpus : six décisions, la scission du chapitre 4
+
+- **Audit complet des 46 cartes** (`AUDIT-CORPUS.md`) : graphe sain (0 cassé, 0 cycle),
+  mais 19 critères mesurables exigeaient 51 à 120 s là où la fenêtre de mesure fait
+  45 s — la mesure ne pouvait structurellement jamais certifier un critère.
+- **Critères ramenés ≤ 45 s** sur toutes les cartes mesurables, cartes pièce comprises
+  (règle « une fois propre » : 1 grille, 1 tour, 1 cycle). Les cartes hors mesure
+  gardent leurs critères d'endurance : elles se notent à la main.
+- **Le chapitre 4 est scindé.** « Le trou et la syncope » (4/4) garde ses quatre
+  patrons et reçoit sa pièce, « When the Saints » (trad.), grille 16 mesures en Sol,
+  carte `saints` à 90 bpm. Le 6/8 devient le chapitre 5 « La mesure ternaire »
+  (`six-huit`, `rising-sun`). Les chapitres suivants glissent d'un rang : palm mute
+  en 6, les six chapitres `avenir` en 7 à 12. Treize chapitres. Sans risque pour la
+  progression : `fusionner` recopie `chapitre` depuis le corpus à chaque chargement.
+- **Deux cartes neuves comblent des trous d'enseignement** : `swing-croches` (ch. 6) —
+  le swing n'apparaissait qu'à `shuffle-mi`, carte pièce à 90 bpm, sans jamais avoir
+  été enseigné ; et `ar-trois` (ch. 3) — l'aller-retour en 3/4 n'était travaillé que
+  sur la pièce. `shuffle-mi` et `scarborough` les exigent désormais.
+- **Racines harmonisées** : les quatre transitions du chapitre 1 qui n'exigeaient
+  rien (`do-lam`, `lam-mim`, `mim-re`, `si7-mim`) et `six-huit` exigent `noires`.
+  Ne restent racines que les cinq entrées légitimes.
+- **Décisions actées par choix multiples** (consignées dans `AUDIT-CORPUS.md` §6) :
+  la bande de tempos s'ouvrira par paliers sur les gestes acquis — matière de la
+  prochaine vague de cartes, avec le vocabulaire de compétences.
+- Corpus porté à **49 cartes** ; graphe revalidé, syntaxe des deux blocs `<script>`
+  vérifiée.
 
 ### 2026-07-28 — Le moteur est branché (étapes 7a à 7e)
 
