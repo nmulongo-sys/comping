@@ -72,6 +72,21 @@ const path = require("path");
        (0,12 − ρ) / (0,12 − 0,03), bornée. null si ρ n'est pas fini —
        jamais 0, qui se lirait « très dispersé » là où il n'y a pas de mesure.
    DUREE_MESURE_S 45 · MESURES_DECOMPTE 2 · GESTES_MIN 24
+
+   ── étape 7e-0 du §14, port de analyse-attaque v1.5 ─────────────────────
+   tempoJoue(gestes, subdivision)     → {pas, R, bpm} | null       §9.2
+       gestes : [{temps_s}] ; subdivision : facteur (1 noires, 2 croches…).
+       Pas de grille réellement JOUÉ — le plus fin qui explique le jeu —
+       converti en bpm par la subdivision déclarée. null sous 10 gestes.
+       Alimente le troisième garde-fou de concluante() (§9.1) et RIEN
+       d'autre : ni la note (§10.1), ni la barre, ni le placement.
+       Estimation par étages, portée verbatim : balayage logarithmique de
+       0,2 s à pMax en 500 pas sur les 20 dernières secondes, puis deux
+       affinages à ±6 % en élargissant la portée à 60 s puis à tout le
+       passage. Ancrer sur l'intervalle MÉDIAN est ce que faisait v1.3, et
+       c'est faux : session à 40 bpm, médiane 1067 ms, réponse 58,7 bpm.
+       Le cache de v1.5 ne se porte pas — il servait une boucle d'affichage,
+       comping n'estime qu'une fois, au bilan.
    ────────────────────────────────────────────────────────────────────────── */
 
 const CHEMIN_MODULE = path.join(__dirname, "mesure-pur.js");
@@ -516,6 +531,74 @@ test("17 · positionBarre aux cinq points remarquables, et null hors domaine", (
   egal(f(null), null, "ρ absent → null, JAMAIS 0 :");
   egal(f(Infinity), null, "ρ non fini → null :");
   egal(f("6"), null, "ρ non numérique → null :");
+});
+
+/* ═══ 7e-0 · tempo joué — §9.2, port de analyse-attaque v1.5 ════════════════
+   Le troisième garde-fou du §9.1 n'était alimenté par RIEN : concluante() ne
+   teste l'écart que si tempo_joue > 0, donc appelée sans la grandeur elle
+   saute la condition et renvoie {ok:true} comme si elle l'avait vérifiée.  */
+
+test("20 · tempoJoue — 90 bpm en croches, gigue de ρ = 6 %", () => {
+  const f = exige("tempoJoue");
+  const pas = 60 / 90 / 2;                         // 333,33 ms
+  const g = gestesSynthetiques({ n: 60, pas_s: pas, sigma_ms: 0.06 * pas * 1000,
+                                 ancre_s: 10, graine: 11 });
+  const r = f(g, 2);
+  vrai(r !== null, "estimation rendue :");
+  proche(r.bpm, 90, 0.9, "bpm à ±1 % :");
+  proche(r.pas, pas, pas * 0.01, "pas de grille joué :");
+  /* Jamais une estimation faite sur rien : sous 10 gestes, null et on le dit. */
+  egal(f(g.slice(0, 9), 2), null, "9 gestes → null :");
+  egal(f([], 2), null, "aucun geste → null :");
+  egal(f(null, 2), null, "liste absente → null :");
+});
+
+test("21 · tempoJoue — jeu mêlant noires et croches à 40 bpm", () => {
+  const f = exige("tempoJoue");
+  const croche = 60 / 40 / 2;                      // 0,75 s
+  /* Le cas exact où l'intervalle médian de v1.3 répondait 58,7 bpm : dès que
+     le jeu mêle des valeurs, la médiane glisse vers les courtes et la
+     pulsation sort de la plage de recherche. Le pas JOUÉ reste la croche. */
+  const motif = [1, 1, 2, 1, 2, 1, 1, 2, 2, 1, 1, 1, 2, 1, 2, 2];
+  const r = alea(23), g = [];
+  let t = 10;
+  for (let i = 0; i < 48; i++) {
+    const u1 = Math.max(r(), 1e-12), u2 = r();
+    const bruit = Math.sqrt(-2 * Math.log(u1)) * Math.cos(2 * Math.PI * u2) * 0.020;
+    g.push({ temps_s: t + bruit });
+    t += motif[i % motif.length] * croche;
+  }
+  const e = f(g, 2);
+  vrai(e !== null, "estimation rendue :");
+  proche(e.bpm, 40, 0.8, "la pulsation reste dans la plage :");
+});
+
+test("22 · §9.1 — tempoJoue PUIS concluante : le garde-fou du tempo est alimenté", () => {
+  const f = exige("tempoJoue");
+  /* Jeu à 94,5 bpm alors que le métronome est réglé à 90 : +5 %, la dérive
+     que B4/B5 montrent à 5–7 tours de phase sur 30 s. La grille d'évaluation
+     reste celle du tempo RÉGLÉ (§4.1) — couper le clic ne coupe pas la
+     grille, et jouer à côté ne la déplace pas non plus. */
+  const REGLE = 90, JOUE = 94.5;
+  const pasJoue = 60 / JOUE / 2, pasRegle = M.pasGrille(REGLE, 2);
+  const g = gestesSynthetiques({ n: 60, pas_s: pasJoue, sigma_ms: 8,
+                                 ancre_s: 10, graine: 29 });
+  const st = M.stats(g, { ancre_s: 10, pas_grille_s: pasRegle });
+  const tj = f(g, 2);
+  vrai(tj !== null, "tempo joué estimé :");
+  proche(tj.bpm, JOUE, 1.0, "tempo joué :");
+
+  const c = M.concluante(st, { tempo_regle: REGLE, tempo_joue: tj.bpm });
+  egal(c.ok, false, "mesure rejetée :");
+  egal(c.motif, "tempo", "motif :");
+  egal(M.noteProposee(st, { concluante: c }).note, null, "aucune note proposée :");
+
+  /* Et la preuve que la chaîne sert à quelque chose : SANS la grandeur, la
+     même prise passe le garde-fou sans un mot. C'est ce que 7e-0 corrige. */
+  const sansGrandeur = M.concluante(st, { tempo_regle: REGLE });
+  vrai(sansGrandeur.motif !== "tempo",
+       "sans tempo_joue le garde-fou est SAUTÉ : le rejet, s'il vient, vient d'ailleurs — " +
+       "obtenu « " + sansGrandeur.motif + " »");
 });
 
 /* ── verdict ──────────────────────────────────────────────────────────────── */
