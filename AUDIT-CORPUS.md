@@ -170,3 +170,21 @@ seuls-24) · `noires-doigts` (noires) · `transitions-ouvertes` (mi-la … sol7-
 Vingt étiquettes. C'est elles que les chansons du répertoire réclameront
 (`exige`), et c'est leur croisement avec les chapitres 6 à 11 qui dira quelles
 cartes manquent vraiment.
+
+---
+
+## 6. Décisions actées le 2026-07-28 (choix multiples)
+
+| # | Question | Décision |
+|---|---|---|
+| A | Critères vs fenêtre 45 s | **Raccourcir à ≤ 45 s** (cartes mesurables) |
+| A′ | Cartes pièce mesurables > 45 s | **Même règle : une fois propre** (1 grille / 1 tour / 1 cycle) |
+| B | Chapitre 4 (4/4 vs 6/8) | **Scinder** — ch. 4 « Le trou et la syncope » (pièce : « When the Saints », trad.), ch. 5 « La mesure ternaire » (Rising Sun) ; chapitres suivants décalés, 13 au total |
+| C | Carte swing manquante | **Les deux** — `swing-croches` créée au ch. 6 (ex-5) ; la variante exigeante attendra le chapitre jazz |
+| D | Carte 3/4 au chapitre 3 | **Oui** — `ar-trois` créée, exigée par `scarborough` |
+| E | Racines asymétriques ch. 1 | **Aligner sur `noires`** (+ `six-huit`) |
+| F | Bande de tempos 60–90 | **Ouvrir par paliers de tempo sur les gestes acquis** — à faire dans la vague de génération, avec le vocabulaire de compétences (§5) |
+
+Mise en œuvre du même jour : corpus à **49 cartes**, 13 chapitres, graphe revalidé
+(0 cassé, 0 cycle), plus aucun critère mesurable au-dessus de 45 s. Les cartes hors
+mesure conservent leurs critères d'endurance.
