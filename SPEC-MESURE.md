@@ -1,5 +1,14 @@
 # comping — spécification du moteur de mesure intégré
 
+> Version 0.14 — 2026-07-28. Étapes **7e-0** et **7e** livrées. `tempoJoue` est porté et
+> le garde-fou du §9.1 est effectivement alimenté (tests 20 à 22). Le branchement relie les
+> pièces que 7a, 7c, 7d et 7e-0 avaient déposées sans appelant, et le premier affichage réel
+> a trouvé ce qu'aucun test pur ne pouvait trouver : la barre de 7d portait la classe d'une
+> **jauge de 4 px** et n'était pas visible (§12.1 point 4). Deux décisions ont été prises en
+> écrivant le code et non dans la spec, contre la règle du §13 : le **tempo est gelé**
+> pendant la prise (§12.1 point 5) et le §9.1 gagne un motif, **`tempo indéterminable`**.
+> Elles sont consignées ici après coup — le signaler vaut mieux que le laisser passer. Le
+> point ouvert **j** est **clos** : `biaisAffichable()` a enfin un appelant.
 > Version 0.13 — 2026-07-28. La lecture du code avant l'écriture de 7e a trouvé un
 > **garde-fou non alimenté** : le §9.1 exige que l'écart du tempo joué au tempo réglé
 > reste sous 3 %, et **rien dans `comping` ne produit ce tempo joué**. `tempoJoue()`
@@ -724,6 +733,16 @@ Deux conséquences fixent l'ordre des travaux :
    disponible ensuite. Une entrée écrite sans le garde-fou reste fausse pour toujours,
    et rien ne la distingue d'une entrée saine.
 
+**Cinquième motif, `tempo indéterminable`** — ajouté en écrivant 7e, hors de l'ordre du
+§13, et consigné ici après coup. `tempoJoue` rend `null` quand la série ne permet pas
+d'estimer une période : moins de dix gestes, ou un passage trop court pour que `pMax`
+dépasse 0,2 s. Si cela arrive **alors que le compte de gestes suffit**, passer `0` à
+`concluante()` rendrait un verdict sur **trois** garde-fous au lieu de quatre sans le
+dire — la panne même que 7e-0 corrige. La mesure est donc déclarée non concluante, avec
+ce motif, et l'écran l'affiche comme les autres. En pratique le cas est théorique : à
+24 gestes sur 45 s, la fenêtre courte de 20 s en contient assez. Il est écrit parce
+qu'un garde-fou qui se saute en silence est exactement ce qu'on vient de réparer.
+
 **Pas de raccourci sur l'estimation.** Ancrer la recherche sur l'intervalle médian est
 exactement ce que faisait `analyse-attaque` v1.3, et c'est faux : dès que le jeu mêle
 des valeurs rythmiques, la médiane glisse vers les courtes et la pulsation sort de la
@@ -1120,6 +1139,21 @@ question au fil suivant.
    introduites par la carte de mesure sont toutes préfixées `mes-`, pour que la
    prochaine ne se pose pas.
 
+5. **Le tempo est gelé pendant la prise : `ramp: false`.** Décision prise en écrivant le
+   code et non dans la spec, contre l'ordre du §13 ; consignée ici après coup.
+
+   Le mode progressif du métronome réécrit `R.bpm` toutes les `rampTous` mesures et
+   pousse la nouvelle valeur dans `carte.bpmTravail` (§6.2). Or `pas_grille` se calcule
+   **depuis `bpmTravail`** : laissé actif, le mode progressif déplacerait la grille du
+   §4.1 pendant les 45 secondes qu'elle sert à mesurer. À 80 bpm en 4/4, une prise dure
+   une quinzaine de mesures — avec `rampPas: 4` et `rampTous: 4`, seize bpm de plus à
+   l'arrivée. Le tempo joué s'écarterait mécaniquement du tempo réglé et le garde-fou du
+   §9.1 rejetterait chaque prise, sans que le motif « tempo » dise la vraie cause.
+
+   La mesure construit donc son réglage à partir du preset de la carte avec `ramp`
+   forcé à `false`, et n'y touche pas d'ici la fin. Le mode progressif reste ce qu'il
+   est **hors** mesure : c'est un outil d'entraînement, pas un régime de prise.
+
 ---
 
 ## 13. Tests d'acceptation
@@ -1208,7 +1242,9 @@ branchement et rouges jusqu'à ce que le code existe (§13, règle inchangée) :
    `calibrationCourante()` est exposée depuis le 2026-07-27 et n'a toujours aucun appelant.
    Seul morceau qui touche vraiment l'écran.
 
-   **7e-0 — tempo joué (port de v1.5).** Étape **ajoutée le 2026-07-28**, à la lecture du
+   ~~**7e-0 — tempo joué (port de v1.5).**~~ — **livrée le 2026-07-28.** `tempoJoue`
+   porté verbatim dans le bloc pur, ajouté à `EXPORTES`, tests 20 à 22 au vert, suite de
+   mesure à **39 sur 39**. Étape **ajoutée le 2026-07-28**, à la lecture du
    code qui précède 7e, et **bloquante pour elle**. `concluante` porte quatre garde-fous
    (§9.1) et le troisième n'est alimenté par rien : `tempoJoue()` n'a jamais été porté.
    Sans lui la condition est sautée **sans erreur visible**, et comme `concluante` est
@@ -1218,7 +1254,12 @@ branchement et rouges jusqu'à ce que le code existe (§13, règle inchangée) :
    Port **verbatim**, comme `regrouper` ; le cache d'estimation de v1.5 ne se porte pas,
    il servait une boucle d'affichage et `comping` n'estime qu'une fois, au bilan.
 
-   **7e — branchement (plomberie).** Étape **ajoutée le 2026-07-28**, à l'écriture de 7d :
+   ~~**7e — branchement (plomberie).**~~ — **livrée le 2026-07-28.** Carte de mesure
+   (présentation → décompte → 45 s → bilan | abandon), bouton de lancement sous le
+   métronome, mention du §3.2 sur les cartes non mesurables, écriture au journal à la
+   validation. Les cinq décisions du §12.1 en sont issues. Le point ouvert **j** est
+   **clos** : `biaisAffichable()` est appelée par `rendreBarre`, qui est appelée par le
+   bilan. Étape **ajoutée le 2026-07-28**, à l'écriture de 7d :
    7a, 7c et 7d déposent chacun des pièces qui n'ont **aucun appelant** —
    `enregistrerMesure`, `historiqueDe`, `cycleMesure`, `rendreBarre`. C'est le même défaut
    que le point ouvert **j** reprochait à `calibrationCourante()`, et le nommer vaut mieux
@@ -1246,7 +1287,7 @@ branchement et rouges jusqu'à ce que le code existe (§13, règle inchangée) :
 | k | Sensibilité de 2,5 trop haute pour le jeu rapide et nuancé | B5 : 84 détections brutes pour 120 attaques jouées. La sous-détection ne se corrige par aucun regroupement. Conditionne la validité de toute mesure hors corde à vide |
 | h | Première calibration réelle | **clos et soldé** (§2.5) : **200 ms, dispersion 3 ms, 24/24, enregistrée le 2026-07-27** sur l'appareil de référence — bien au-dessus des 20 ms, le son passe par l'air |
 | i | σ de phase contre σ_locale (§4.4) | conditionne la colonne « % en cible » du §10.2 |
-| j | Consommateurs du §2.3 | `calibrationCourante()` est exposée, rien ne l'appelle encore : le masquage du biais arrive en **7d** (§14) |
+| j | Consommateurs du §2.3 | **clos le 2026-07-28** par 7e. `calibrationCourante()` → `biaisAffichable()` → `rendreBarre()` → bilan de la carte de mesure : la chaîne a un appelant de bout en bout. Ouvert depuis le 27, il aura survécu à 7d — qui écrivait la règle sans la brancher — et c'est lui qui a fait nommer l'étape 7e |
 | f | Origine des doublons à 59–75 ms | **tranché** : redéclenchement sur la résonance du corps à la sortie du temps réfractaire, pas le balayage des cordes — un accord plaqué ne produit que 1,1 détection par geste. `fusion_ms = 120` les absorbe. |
 
 ---
