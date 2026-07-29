@@ -1,3 +1,12 @@
+> **Dépôt archivé — 2026-07-29.**
+> L'application a déménagé vers le **Portail Formation Musicale** :
+> <https://portailrythmique.pages.dev/comping/>
+>
+> `index.html` de ce dépôt ne sert plus l'application : c'est une page de redirection qui
+> propose d'abord d'exporter la progression restée dans le `localStorage` de
+> `nmulongo-sys.github.io`, laquelle ne suit pas le changement de domaine.
+> Le code d'origine reste dans l'historique git (dernier commit applicatif : `113513a`).
+
 # comping
 
 Application d'entraînement quotidien à la guitare rythmique : le temps disponible est
